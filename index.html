@@ -496,7 +496,9 @@ async function savePredictions() {
 async function renderLeaderboard() {
   const allPredsSnap = await db.ref('predictions').get();
   const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
-  const users = Object.keys(state.users);
+  
+  // AQUÍ ESTÁ EL CAMBIO: Filtramos al admin para que no entre en la clasificación
+  const users = Object.keys(state.users).filter(u => u !== ADMIN_USER);
   
   const ranked = users.map(u => {
     const userPreds = allPreds[u] || {};
