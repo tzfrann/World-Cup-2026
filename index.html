@@ -224,14 +224,15 @@
     <div id="tab-panel-predictions">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
         <div style="font-size:13px; color:var(--color-text-secondary);" id="pred-progress-label"></div>
-        <button class="btn btn-sm btn-primary" onclick="savePredictions()"><i class="ti ti-device-floppy"></i> Save all</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-sm" style="color:var(--color-text-danger); border-color:var(--color-text-danger); background:transparent;" onclick="clearUnplayedPredictions()" title="Clear unplayed predictions">
+            <i class="ti ti-eraser"></i> Clear unlocked
+          </button>
+          <button class="btn btn-sm btn-primary" onclick="savePredictions()">
+            <i class="ti ti-device-floppy" aria-hidden="true"></i> Save all
+          </button>
+        </div>
       </div>
-      <div class="progress-bar-wrap" style="margin-bottom:16px;">
-        <div class="progress-bar" id="pred-progress-bar" style="width:0%"></div>
-      </div>
-      <div id="alert-save" class="alert" style="display:none"></div>
-      <div id="predictions-list"></div>
-    </div>
 
     <div id="tab-panel-leaderboard" style="display:none">
       <div class="two-col" style="margin-bottom:1rem;" id="lb-stats"></div>
