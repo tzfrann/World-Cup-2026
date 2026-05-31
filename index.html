@@ -184,20 +184,29 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">How scoring works</div>
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <span class="pts-badge pts-exact">+3 pts</span>
-          <span style="font-size:13px; color:var(--color-text-primary);">Exact score correct</span>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <span class="pts-badge pts-result">+1 pt</span>
-          <span style="font-size:13px; color:var(--color-text-primary);">Correct result (win/draw/loss)</span>
-        </div>
+<div class="card">
+      <div class="card-title">Sign in</div>
+      <div class="field-group">
+        <label class="field-label" for="login-name">Your Name</label>
+        <input type="text" id="login-name" autocomplete="off">
+      </div>
+      
+      <div class="field-group" id="league-group" style="display:none;">
+        <label class="field-label" for="login-league">League Name</label>
+        <input type="text" id="login-league" autocomplete="off">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="login-pin">PIN (4 digits)</label>
+        <input type="password" id="login-pin" maxlength="4" autocomplete="off">
+      </div>
+      
+      <div id="login-error" class="alert" style="display:none"></div>
+      <button class="btn btn-primary" onclick="doLogin()"><i class="ti ti-login"></i> Sign in / Register</button>
+      <div style="margin-top: 10px; font-size: 12px; color: var(--color-text-tertiary);">
+        Introduce tu nombre y PIN. Si eres nuevo, te pediremos la liga en el siguiente paso.
       </div>
     </div>
-  </div>
 
   <div id="screen-main" class="screen">
     <div class="top-bar">
