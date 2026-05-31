@@ -353,28 +353,52 @@ async function doLogin() {
   const pin  = document.getElementById('login-pin').value.trim();
   const errEl = document.getElementById('login-error');
 
-  if (!name || pin.length !== 4) { errEl.textContent = 'Please enter a name and a 4-digit PIN.'; errEl.style.display = 'block'; return; }
+  if (!name || pin.length !== 4) { 
+    errEl.textContent = 'Please enter a name and a 4-digit PIN.'; 
+    errEl.style.display = 'block'; 
+    return; 
+  }
 
   const snap = await db.ref(`users/${name}`).get();
+  
   if (snap.exists()) {
-    if (snap.val().pin !== pin) { errEl.textContent = 'Incorrect PIN. Try again.'; errEl.style.display = 'block'; return; }
+    // El usuario existe, comprobamos el PIN
+    if (snap.val().pin !== pin) { 
+      errEl.textContent = 'Incorrect PIN. Try again.'; 
+      errEl.style.display = 'block'; 
+      return; 
+    }
   } else {
+    // El usuario NO existe, lanzamos la confirmación
+    const wantsToCreate = confirm(`El usuario "${name}" no existe. ¿Quieres crear una cuenta nueva con este nombre y el PIN introducido?`);
+    
+    if (!wantsToCreate) {
+      errEl.textContent = 'Login cancelado. Comprueba si has escrito bien tu nombre.';
+      errEl.style.display = 'block';
+      return; // Cortamos la ejecución aquí si le da a cancelar
+    }
+
+    // Si le da a Aceptar, lo registramos en la base de datos
     await db.ref(`users/${name}`).set({ pin });
     state.users[name] = { pin };
   }
 
+  // A partir de aquí sigue el flujo normal de carga de datos
   const predSnap = await db.ref(`predictions/${name}`).get();
   state.predictions[name] = predSnap.exists() ? predSnap.val() : {};
 
-  errEl.style.display = 'none'; state.currentUser = name; attachListeners(name);
+  errEl.style.display = 'none'; 
+  state.currentUser = name; 
+  attachListeners(name);
 
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-main').classList.add('active');
   document.getElementById('user-label').textContent = name;
   document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
   
-  // AQUÍ ESTÁ LA MAGIA DEL CERROJO:
-  if (name === ADMIN_USER && pin === ADMIN_PIN) document.getElementById('admin-toggle-btn').style.display = 'flex';
+  if (name === ADMIN_USER && pin === ADMIN_PIN) {
+    document.getElementById('admin-toggle-btn').style.display = 'flex';
+  }
   
   renderPredictions();
 }
