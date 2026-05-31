@@ -999,13 +999,29 @@ function renderAdmin() {
     Object.keys(leaguesGroup).sort().forEach(l => {
       html += `<div style="font-size:12px; font-weight:600; color:var(--color-text-secondary); margin:12px 0 6px;">LEAGUE: ${l.toUpperCase()}</div>`;
       leaguesGroup[l].forEach(u => {
-        // En Admin vemos el mote y el ID real para saber quién es quién
-        const displayNick = (state.users[u].nicknames && state.users[u].nicknames[l]) ? state.users[u].nicknames[l] : u;
+        const uData = state.users[u];
+        const displayNick = (uData.nicknames && uData.nicknames[l]) ? uData.nicknames[l] : u;
         const label = displayNick !== u ? `${displayNick} <span style="font-size:10px; color:var(--color-text-tertiary);">(@${u})</span>` : u;
+        
+        // Comprobamos el estado (los usuarios antiguos se consideran validados por defecto)
+        const isPending = uData.status === 'pending';
+
+        let buttonsHtml = '';
+        if (isPending) {
+          buttonsHtml = `
+            <div style="display:flex; gap:4px;">
+              <button class="btn btn-sm btn-primary" style="padding:4px 8px; font-size:11px;" onclick="acceptUser('${u}')"><i class="ti ti-check"></i> Accept</button>
+              <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent; padding:4px 8px; font-size:11px;" onclick="deleteUser('${u}')"><i class="ti ti-trash"></i> Ban</button>
+            </div>
+          `;
+        } else {
+          // Si está validado, quitamos el botón de borrar y ponemos un escudo
+          buttonsHtml = `<span style="font-size:11px; color:var(--color-text-success); font-weight:600;"><i class="ti ti-shield-check"></i> Validated</span>`;
+        }
 
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
           <span style="font-size:13px; font-weight:500;">${label}</span>
-          <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')" title="Bans user completely from the app"><i class="ti ti-trash"></i> Ban User</button>
+          ${buttonsHtml}
         </div>`;
       });
     });
@@ -1085,6 +1101,12 @@ async function deleteUser(username) {
   renderAdmin(); renderLeaderboard();
 }
 
+ async function acceptUser(username) {
+  await db.ref(`users/${username}/status`).set('accepted');
+  state.users[username].status = 'accepted';
+  renderAdmin();
+} 
+  
 loadState();
 </script>
 </body>
