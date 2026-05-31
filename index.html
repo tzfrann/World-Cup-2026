@@ -64,12 +64,12 @@
 
     .field-group { margin-bottom: 12px; }
     .field-label { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 4px; display: block; font-weight: 500; }
-    input[type="text"], input[type="number"], input[type="password"], input[type="datetime-local"] {
+    input[type="text"], input[type="number"], input[type="password"], input[type="datetime-local"], select {
       width: 100%; padding: 8px 10px; border: 0.5px solid var(--color-border-secondary);
       border-radius: var(--border-radius-md); background: var(--color-background-secondary);
       color: var(--color-text-primary); font-size: 15px; font-family: var(--font-sans);
     }
-    input:focus { outline: 2px solid var(--color-border-info); outline-offset: 1px; }
+    input:focus, select:focus { outline: 2px solid var(--color-border-info); outline-offset: 1px; }
 
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -96,10 +96,10 @@
     .pts-none { color: var(--color-text-tertiary); font-size: 11px; }
 
     .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
-    .user-pill { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); }
+    .user-pill { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-secondary); }
     .avatar {
-      width: 28px; height: 28px; border-radius: 50%; background: var(--wc-green); color: #fff;
-      display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+      width: 32px; height: 32px; border-radius: 50%; background: var(--wc-green); color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;
     }
 
     .next-match-card {
@@ -161,8 +161,8 @@
       <div class="wc-title">Score Predictor</div>
       <div class="wc-sub">Compete with friends on all 72 group stage matches</div>
     </div>
-
-<div class="card">
+    
+    <div class="card">
       <div class="card-title">Sign in</div>
       <div class="field-group">
         <label class="field-label" for="login-name">Your Name</label>
@@ -171,7 +171,7 @@
       
       <div class="field-group" id="league-group" style="display:none;">
         <label class="field-label" for="login-league">League Name</label>
-        <input type="text" id="login-league" autocomplete="off">
+        <input type="text" id="login-league" autocomplete="off" placeholder="Solicita una liga al Admin">
       </div>
 
       <div class="field-group">
@@ -186,11 +186,32 @@
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title">How scoring works</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="pts-badge pts-exact">+3 pts</span>
+          <span style="font-size:13px; color:var(--color-text-primary);">Exact score correct</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="pts-badge pts-result">+1 pt</span>
+          <span style="font-size:13px; color:var(--color-text-primary);">Correct result (win/draw/loss)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="screen-main" class="screen">
     <div class="top-bar">
       <div class="user-pill">
         <div class="avatar" id="user-avatar">?</div>
-        <span id="user-label" style="font-weight:600; color:var(--color-text-primary);"></span>
+        <div style="display:flex; flex-direction:column; justify-content:center;">
+          <span id="user-label" style="font-weight:600; color:var(--color-text-primary); line-height:1.2;"></span>
+          <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
+            <select id="league-selector" class="score-input" style="font-size:11px; padding:0 4px; height:20px; width:auto; border-radius:4px; border-color:var(--color-border-tertiary);" onchange="changeLeague()"></select>
+            <button class="btn btn-sm" style="padding:0 6px; height:20px; font-size:12px; background:var(--color-background-secondary); border:0.5px solid var(--color-border-tertiary);" onclick="joinLeaguePrompt()" title="Join another league"><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
       </div>
       <div style="display:flex; gap:6px;">
         <button class="btn btn-sm" id="admin-toggle-btn" onclick="toggleAdmin()" style="display:none"><i class="ti ti-settings"></i> Admin</button>
@@ -363,16 +384,14 @@ function attachListeners(username) {
   });
 }
 
-// --- 5. FUNCIONES DE USUARIO ACTUALIZADAS ---
-// --- 5. FUNCIONES DE USUARIO ACTUALIZADAS ---
+// --- 5. FUNCIONES DE USUARIO ACTUALIZADAS Y MULTI-LIGA ---
 async function doLogin() {
   const name = document.getElementById('login-name').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
   const leagueGroup = document.getElementById('league-group');
-  const league = document.getElementById('login-league').value.trim();
+  const leagueInput = document.getElementById('login-league').value.trim();
   const errEl = document.getElementById('login-error');
 
-  // Ahora solo exigimos Nombre y PIN para el primer clic
   if (!name || pin.length !== 4) { 
     errEl.className = 'alert alert-error';
     errEl.textContent = 'Debes introducir tu nombre y un PIN de 4 dígitos.'; 
@@ -380,11 +399,12 @@ async function doLogin() {
     return; 
   }
 
-  let finalLeague = league;
+  let finalLeague = leagueInput;
+  let userLeagues = {};
   const snap = await db.ref(`users/${name}`).get();
   
   if (snap.exists()) {
-    // EL USUARIO YA EXISTE -> Entra directo
+    // EL USUARIO YA EXISTE -> Entra directo sin preguntar liga
     const userData = snap.val();
     if (userData.pin !== pin) { 
         errEl.className = 'alert alert-error';
@@ -392,34 +412,41 @@ async function doLogin() {
         errEl.style.display = 'block'; 
         return; 
     }
-    finalLeague = userData.league || 'Global';
+    
+    // Migración transparente si viene de la versión anterior
+    if (userData.league && !userData.leagues) {
+       userLeagues[userData.league] = true;
+       await db.ref(`users/${name}/leagues`).set(userLeagues);
+    } else if (userData.leagues) {
+       userLeagues = userData.leagues;
+    } else {
+       userLeagues['Global'] = true;
+    }
+    finalLeague = Object.keys(userLeagues)[0]; 
   } else {
     // EL USUARIO ES NUEVO
     if (leagueGroup.style.display === 'none') {
-        // Primer intento: Desplegamos la caja de la liga
         leagueGroup.style.display = 'block';
         errEl.className = 'alert alert-success';
-        errEl.textContent = `¡Hola ${name}! Como eres nuevo, escribe abajo a qué liga quieres unirte y vuelve a pulsar Sign in.`;
+        errEl.textContent = `¡Hola ${name}! Como eres nuevo, dinos a qué liga quieres unirte y vuelve a darle a Sign in.`;
         errEl.style.display = 'block';
         return;
     } else {
-        // Segundo intento: Ya tiene la caja de liga a la vista y la ha rellenado
-        if (!league) {
+        if (!leagueInput) {
             errEl.className = 'alert alert-error';
             errEl.textContent = 'Por favor, escribe el nombre de la liga para registrarte.';
             return;
         }
         
-        const isMasterAdmin = (name === ADMIN_USER && pin === ADMIN_PIN && league === 'Admin');
+        const isMasterAdmin = (name === ADMIN_USER && pin === ADMIN_PIN && leagueInput === 'Admin');
         
         if (!isMasterAdmin) {
-            if (!state.leagues || !state.leagues[league]) {
+            if (!state.leagues || !state.leagues[leagueInput]) {
               errEl.className = 'alert alert-error';
-              errEl.textContent = `La liga "${league}" no existe. Pídele al administrador que la cree.`; 
+              errEl.textContent = `La liga "${leagueInput}" no existe. Pídele al administrador que la cree.`; 
               return;
             }
         } else {
-            // El Super Admin se crea su propia liga si no existe
             if (!state.leagues || !state.leagues['Admin']) {
                 await db.ref('leagues/Admin').set(true);
                 if(!state.leagues) state.leagues = {};
@@ -427,27 +454,30 @@ async function doLogin() {
             }
         }
         
-        const wantsToCreate = confirm(`¿Quieres registrar la cuenta "${name}" en la liga "${league}"?`);
+        const wantsToCreate = confirm(`¿Quieres registrar la cuenta "${name}" en la liga "${leagueInput}"?`);
         if (!wantsToCreate) return;
         
-        await db.ref(`users/${name}`).set({ pin, league });
-        state.users[name] = { pin, league };
-        finalLeague = league;
+        userLeagues[leagueInput] = true;
+        await db.ref(`users/${name}`).set({ pin, leagues: userLeagues });
+        state.users[name] = { pin, leagues: userLeagues };
+        finalLeague = leagueInput;
     }
   }
 
-  // FLUJO FINAL DE LOGIN PARA TODOS (Nuevos y antiguos)
+  // FLUJO DE ENTRADA FINAL
   const predSnap = await db.ref(`predictions/${name}`).get();
   state.predictions[name] = predSnap.exists() ? predSnap.val() : {};
 
-  errEl.style.display = 'none'; state.currentUser = name; state.currentLeague = finalLeague;
+  errEl.style.display = 'none'; state.currentUser = name; 
   attachListeners(name);
   
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-main').classList.add('active');
   
-  document.getElementById('user-label').innerHTML = `${name} <span style="font-weight:400; font-size:11px; opacity:0.7;">(${finalLeague})</span>`;
+  document.getElementById('user-label').textContent = name;
   document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
+  
+  updateLeagueSelector(userLeagues, finalLeague);
   
   if (name === ADMIN_USER && pin === ADMIN_PIN) {
     document.getElementById('admin-toggle-btn').style.display = 'flex';
@@ -463,15 +493,56 @@ function doLogout() {
   document.getElementById('login-name').value = ''; 
   document.getElementById('login-pin').value = ''; 
   document.getElementById('login-league').value = '';
-  
-  // Escondemos los campos para que la pantalla quede limpia para el siguiente
   document.getElementById('league-group').style.display = 'none';
   document.getElementById('login-error').style.display = 'none';
-  
   document.getElementById('admin-toggle-btn').style.display = 'none';
   clearInterval(countdownTimer);
   switchTab('predictions');
 }
+
+// GESTIÓN DE MÚLTIPLES LIGAS DESDE DENTRO
+function updateLeagueSelector(leaguesObj, activeL) {
+   const sel = document.getElementById('league-selector');
+   sel.innerHTML = '';
+   Object.keys(leaguesObj).forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l; opt.textContent = l;
+      if(l === activeL) opt.selected = true;
+      sel.appendChild(opt);
+   });
+   state.currentLeague = activeL;
+}
+
+function changeLeague() {
+   state.currentLeague = document.getElementById('league-selector').value;
+   renderLeaderboard();
+}
+
+async function joinLeaguePrompt() {
+   const lName = prompt("Escribe el nombre exacto de la liga a la que te quieres unir:");
+   if (!lName) return;
+   
+   if (!state.leagues || !state.leagues[lName]) {
+      alert(`La liga "${lName}" no existe. Pídesela al Administrador.`);
+      return;
+   }
+   
+   const uid = state.currentUser;
+   let uLeagues = state.users[uid].leagues || {};
+   if (uLeagues[lName]) {
+      alert("Ya perteneces a esta liga.");
+      return;
+   }
+   
+   uLeagues[lName] = true;
+   await db.ref(`users/${uid}/leagues`).set(uLeagues);
+   state.users[uid].leagues = uLeagues;
+   
+   updateLeagueSelector(uLeagues, lName);
+   renderLeaderboard();
+   alert(`¡Te has unido a la liga "${lName}" con éxito!`);
+}
+
 // --- 6. RENDERIZADO DE PANTALLAS ---
 function switchTab(tab) {
   ['predictions','leaderboard','results','admin'].forEach(t => {
@@ -629,14 +700,13 @@ async function savePredictions() {
   setTimeout(() => al.style.display = 'none', 3000);
 }
 
-// LEADERBOARD CON FILTRO DE LIGAS
+// LEADERBOARD (Filtra por la liga actualmente seleccionada en el desplegable)
 async function renderLeaderboard() {
   const allPredsSnap = await db.ref('predictions').get();
   const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
   
-  // Filtramos: Solo competidores de tu misma liga
   const users = Object.keys(state.users).filter(u => 
-    u !== ADMIN_USER && state.users[u].league === state.currentLeague
+    u !== ADMIN_USER && state.users[u].leagues && state.users[u].leagues[state.currentLeague]
   );
   
   const ranked = users.map(u => {
@@ -691,7 +761,7 @@ function renderResults() {
   document.getElementById('results-list').innerHTML=html;
 }
 
-// PANEL DE ADMIN (CREAR LIGAS Y BORRAR USUARIOS)
+// PANEL DE ADMIN (Muestra en qué ligas está cada usuario)
 function renderAdmin() {
   let html = '';
   
@@ -726,9 +796,11 @@ function renderAdmin() {
   } else {
     const leaguesGroup = {};
     users.forEach(u => {
-      const l = state.users[u].league || 'Unknown';
-      if(!leaguesGroup[l]) leaguesGroup[l] = [];
-      leaguesGroup[l].push(u);
+      const uLeagues = state.users[u].leagues ? Object.keys(state.users[u].leagues) : ['Unknown'];
+      uLeagues.forEach(l => {
+         if(!leaguesGroup[l]) leaguesGroup[l] = [];
+         leaguesGroup[l].push(u);
+      });
     });
     
     Object.keys(leaguesGroup).sort().forEach(l => {
@@ -736,7 +808,7 @@ function renderAdmin() {
       leaguesGroup[l].forEach(u => {
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
           <span style="font-size:13px; font-weight:500;">${u}</span>
-          <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')"><i class="ti ti-trash"></i> Delete</button>
+          <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')" title="Bans user completely from the app"><i class="ti ti-trash"></i> Ban User</button>
         </div>`;
       });
     });
@@ -784,7 +856,7 @@ async function createLeague() {
 }
 
 async function deleteLeague(lName) {
-  const confirmDel = confirm(`¿Seguro que quieres borrar la liga "${lName}"? NOTA: Esto no borrará a los usuarios que estén dentro, solo eliminará la liga de la lista permitida.`);
+  const confirmDel = confirm(`¿Seguro que quieres borrar la liga "${lName}"? NOTA: Esto no borrará a los usuarios que estén dentro, solo eliminará la liga de la lista permitida para nuevos ingresos.`);
   if (!confirmDel) return;
   await db.ref(`leagues/${lName}`).remove();
 }
@@ -808,7 +880,7 @@ async function clearResult(matchId) {
 }
 
 async function deleteUser(username) {
-  const confirmDelete = confirm(`¿Estás seguro de que quieres expulsar a "${username}"?\nSe borrarán todas sus predicciones y desaparecerá de la clasificación para siempre.`);
+  const confirmDelete = confirm(`¿Estás seguro de que quieres expulsar permanentemente a "${username}" del juego?\nSe borrarán todas sus predicciones de todas las ligas.`);
   if (!confirmDelete) return;
   await db.ref(`users/${username}`).remove();
   await db.ref(`predictions/${username}`).remove();
