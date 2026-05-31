@@ -165,8 +165,8 @@
     <div class="card">
       <div class="card-title">Sign in</div>
       <div class="field-group">
-        <label class="field-label" for="login-name">Your Name</label>
-        <input type="text" id="login-name" autocomplete="off">
+        <label class="field-label" for="login-name">Your Main ID (Login Name)</label>
+        <input type="text" id="login-name" autocomplete="off" placeholder="Identificador único">
       </div>
       
       <div class="field-group" id="league-group" style="display:none;">
@@ -187,7 +187,7 @@
       <div id="login-error" class="alert" style="display:none"></div>
       <button class="btn btn-primary" onclick="doLogin()"><i class="ti ti-login"></i> Sign in / Register</button>
       <div style="margin-top: 10px; font-size: 12px; color: var(--color-text-tertiary);">
-        Introduce tu nombre y PIN. Si eres nuevo, te pediremos la liga en el siguiente paso.
+        Usa siempre el mismo ID de usuario. Podrás elegir tus "motes" dentro de cada liga.
       </div>
     </div>
 
@@ -211,7 +211,10 @@
       <div class="user-pill">
         <div class="avatar" id="user-avatar">?</div>
         <div style="display:flex; flex-direction:column; justify-content:center;">
-          <span id="user-label" style="font-weight:600; color:var(--color-text-primary); line-height:1.2;"></span>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span id="user-label" style="font-weight:600; color:var(--color-text-primary); line-height:1.2;"></span>
+            <button class="btn btn-sm" style="padding:0; width:18px; height:18px; background:transparent; border:none; color:var(--color-text-tertiary);" onclick="editNickname()" title="Edit nickname for this league"><i class="ti ti-pencil"></i></button>
+          </div>
           <div style="display:flex; align-items:center; gap:4px; margin-top:2px;">
             <select id="league-selector" class="score-input" style="font-size:11px; padding:0 4px; height:20px; width:auto; border-radius:4px; border-color:var(--color-border-tertiary);" onchange="changeLeague()"></select>
             <button class="btn btn-sm" style="padding:0 6px; height:20px; font-size:12px; background:var(--color-background-secondary); border:0.5px solid var(--color-border-tertiary);" onclick="joinLeaguePrompt()" title="Join another league"><i class="ti ti-plus"></i></button>
@@ -359,12 +362,13 @@ async function loadState() {
   if (leaguesSnap.exists()) state.leagues = leaguesSnap.val();
 }
 
-let resultsListener = null, predictionsListener = null, schedulesListener = null, leaguesListener = null;
+let resultsListener = null, predictionsListener = null, schedulesListener = null, leaguesListener = null, usersListener = null;
 
 function attachListeners(username) {
   if (resultsListener) db.ref('results').off('value', resultsListener);
   if (schedulesListener) db.ref('schedules').off('value', schedulesListener);
   if (leaguesListener) db.ref('leagues').off('value', leaguesListener);
+  if (usersListener) db.ref('users').off('value', usersListener);
   if (predictionsListener && state.currentUser) db.ref(`predictions/${state.currentUser}`).off('value', predictionsListener);
   
   resultsListener = db.ref('results').on('value', snap => {
@@ -382,6 +386,12 @@ function attachListeners(username) {
     renderAdmin();
   });
 
+  // Para actualizar motes en vivo en el Leaderboard
+  usersListener = db.ref('users').on('value', snap => {
+    state.users = snap.exists() ? snap.val() : {};
+    renderLeaderboard(); renderAdmin();
+  });
+
   predictionsListener = db.ref(`predictions/${username}`).on('value', snap => {
     if (!state.predictions[username]) state.predictions[username] = {};
     if (snap.exists()) state.predictions[username] = snap.val();
@@ -391,7 +401,6 @@ function attachListeners(username) {
 
 // --- 5. FUNCIONES DE USUARIO ACTUALIZADAS ---
 
-// NUEVA FUNCIÓN: Mostrar/Ocultar el PIN
 function togglePinVisibility() {
   const pinInput = document.getElementById('login-pin');
   const eyeIcon = document.getElementById('pin-eye-icon');
@@ -404,6 +413,34 @@ function togglePinVisibility() {
   }
 }
 
+// FUNCIÓN PARA PINTAR EL NOMBRE CORRECTO ARRIBA
+function updateTopBarName() {
+  const uid = state.currentUser;
+  const currentL = state.currentLeague;
+  const uData = state.users[uid] || {};
+  const nick = (uData.nicknames && uData.nicknames[currentL]) ? uData.nicknames[currentL] : uid;
+  
+  document.getElementById('user-label').innerHTML = `${nick} <span style="font-weight:400; font-size:11px; opacity:0.7;">(${currentL})</span>`;
+  document.getElementById('user-avatar').textContent = nick.substring(0,2).toUpperCase();
+}
+
+async function editNickname() {
+  const uid = state.currentUser;
+  const currentL = state.currentLeague;
+  const currentNick = (state.users[uid].nicknames && state.users[uid].nicknames[currentL]) ? state.users[uid].nicknames[currentL] : uid;
+  
+  const newNick = prompt(`Elige tu apodo/mote para la liga "${currentL}":`, currentNick);
+  if (newNick !== null && newNick.trim() !== "") {
+    const finalNick = newNick.trim();
+    await db.ref(`users/${uid}/nicknames/${currentL}`).set(finalNick);
+    if (!state.users[uid].nicknames) state.users[uid].nicknames = {};
+    state.users[uid].nicknames[currentL] = finalNick;
+    
+    updateTopBarName();
+    renderLeaderboard();
+  }
+}
+
 async function doLogin() {
   const name = document.getElementById('login-name').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
@@ -413,7 +450,7 @@ async function doLogin() {
 
   if (!name || pin.length !== 4) { 
     errEl.className = 'alert alert-error';
-    errEl.textContent = 'Debes introducir tu nombre y un PIN de 4 dígitos.'; 
+    errEl.textContent = 'Debes introducir tu ID principal y un PIN de 4 dígitos.'; 
     errEl.style.display = 'block'; 
     return; 
   }
@@ -470,12 +507,12 @@ async function doLogin() {
             }
         }
         
-        const wantsToCreate = confirm(`¿Quieres registrar la cuenta "${name}" en la liga "${leagueInput}"?`);
+        const wantsToCreate = confirm(`¿Quieres registrar el usuario "${name}" en la liga "${leagueInput}"?`);
         if (!wantsToCreate) return;
         
         userLeagues[leagueInput] = true;
-        await db.ref(`users/${name}`).set({ pin, leagues: userLeagues });
-        state.users[name] = { pin, leagues: userLeagues };
+        await db.ref(`users/${name}`).set({ pin, leagues: userLeagues, nicknames: {} });
+        state.users[name] = { pin, leagues: userLeagues, nicknames: {} };
         finalLeague = leagueInput;
     }
   }
@@ -483,16 +520,14 @@ async function doLogin() {
   const predSnap = await db.ref(`predictions/${name}`).get();
   state.predictions[name] = predSnap.exists() ? predSnap.val() : {};
 
-  errEl.style.display = 'none'; state.currentUser = name; 
+  errEl.style.display = 'none'; state.currentUser = name; state.currentLeague = finalLeague;
   attachListeners(name);
   
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-main').classList.add('active');
   
-  document.getElementById('user-label').textContent = name;
-  document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
-  
   updateLeagueSelector(userLeagues, finalLeague);
+  updateTopBarName();
   
   if (name === ADMIN_USER && pin === ADMIN_PIN) {
     document.getElementById('admin-toggle-btn').style.display = 'flex';
@@ -511,7 +546,6 @@ function doLogout() {
   document.getElementById('league-group').style.display = 'none';
   document.getElementById('login-error').style.display = 'none';
   
-  // Reseteamos el icono del ojo al salir por seguridad
   document.getElementById('login-pin').type = 'password';
   document.getElementById('pin-eye-icon').className = 'ti ti-eye';
   
@@ -534,6 +568,7 @@ function updateLeagueSelector(leaguesObj, activeL) {
 
 function changeLeague() {
    state.currentLeague = document.getElementById('league-selector').value;
+   updateTopBarName();
    renderLeaderboard();
 }
 
@@ -558,8 +593,9 @@ async function joinLeaguePrompt() {
    state.users[uid].leagues = uLeagues;
    
    updateLeagueSelector(uLeagues, lName);
+   updateTopBarName();
    renderLeaderboard();
-   alert(`¡Te has unido a la liga "${lName}" con éxito!`);
+   alert(`¡Te has unido a la liga "${lName}" con éxito! Usa el icono del lápiz si quieres ponerte un mote para este grupo.`);
 }
 
 // --- 6. RENDERIZADO DE PANTALLAS ---
@@ -719,7 +755,7 @@ async function savePredictions() {
   setTimeout(() => al.style.display = 'none', 3000);
 }
 
-// LEADERBOARD (Filtra por la liga seleccionada)
+// LEADERBOARD (Muestra el MOTE en vez del ID real)
 async function renderLeaderboard() {
   const allPredsSnap = await db.ref('predictions').get();
   const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
@@ -749,9 +785,12 @@ async function renderLeaderboard() {
   let html = '';
   ranked.forEach((u,i) => {
     const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    // Buscamos el mote para esta liga. Si no tiene, usamos su ID original.
+    const displayNick = (state.users[u.name].nicknames && state.users[u.name].nicknames[state.currentLeague]) ? state.users[u.name].nicknames[state.currentLeague] : u.name;
+    
     html += `<div class="leaderboard-row">
       <div class="rank ${rankClass}">${i+1}</div>
-      <div><div class="lb-name">${u.name}</div><div class="lb-exact">${u.exact} exact · ${u.result} result</div></div>
+      <div><div class="lb-name">${displayNick}</div><div class="lb-exact">${u.exact} exact · ${u.result} result</div></div>
       <div class="lb-pts">${u.pts} pts</div>
     </div>`;
   });
@@ -823,8 +862,12 @@ function renderAdmin() {
     Object.keys(leaguesGroup).sort().forEach(l => {
       html += `<div style="font-size:12px; font-weight:600; color:var(--color-text-secondary); margin:12px 0 6px;">LEAGUE: ${l.toUpperCase()}</div>`;
       leaguesGroup[l].forEach(u => {
+        // En Admin vemos el mote y el ID real para saber quién es quién
+        const displayNick = (state.users[u].nicknames && state.users[u].nicknames[l]) ? state.users[u].nicknames[l] : u;
+        const label = displayNick !== u ? `${displayNick} <span style="font-size:10px; color:var(--color-text-tertiary);">(@${u})</span>` : u;
+
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
-          <span style="font-size:13px; font-weight:500;">${u}</span>
+          <span style="font-size:13px; font-weight:500;">${label}</span>
           <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')" title="Bans user completely from the app"><i class="ti ti-trash"></i> Ban User</button>
         </div>`;
       });
