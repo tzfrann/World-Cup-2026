@@ -104,6 +104,22 @@
       display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
     }
 
+    /* ESTILOS DEL NUEVO BANNER DE CUENTA ATRÁS */
+    .next-match-card {
+      background: linear-gradient(135deg, var(--wc-dark) 0%, var(--wc-green) 100%);
+      border-radius: var(--border-radius-lg);
+      padding: 1.25rem;
+      color: white;
+      box-shadow: 0 4px 12px rgba(26, 107, 58, 0.2);
+    }
+    .nm-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.7); margin-bottom: 12px; display:flex; justify-content: space-between; font-weight:600;}
+    .nm-teams { display: flex; align-items: center; justify-content: space-between; font-size: 18px; font-weight: 600; margin-bottom: 16px;}
+    .nm-team { display: flex; align-items: center; gap: 8px; flex:1;}
+    .nm-team.right { justify-content: flex-end; }
+    .nm-vs { font-size: 13px; color: rgba(255,255,255,0.5); font-weight:500; padding: 0 10px;}
+    .nm-footer { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: var(--border-radius-md); font-size: 13px;}
+    .nm-countdown { font-weight: 600; color: #ffecb3; font-variant-numeric: tabular-nums; display:flex; gap:6px; align-items:center;}
+
     .tab-bar {
       display: flex; gap: 4px; background: var(--color-background-primary);
       border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg);
@@ -212,6 +228,8 @@
         <button class="btn btn-sm" onclick="doLogout()"><i class="ti ti-logout"></i> Sign out</button>
       </div>
     </div>
+
+    <div id="next-match-banner" style="display:none; margin-bottom:1.25rem;"></div>
 
     <div class="tab-bar">
       <button class="tab active" onclick="switchTab('predictions')" id="tab-predictions"><i class="ti ti-ball-football"></i> Predictions</button>
@@ -361,13 +379,13 @@ function attachListeners(username) {
 
   schedulesListener = db.ref('schedules').on('value', snap => {
     state.schedules = snap.exists() ? snap.val() : {};
-    renderPredictions(); renderAdmin();
+    renderPredictions(); renderAdmin(); renderNextMatch();
   });
 
   predictionsListener = db.ref(`predictions/${username}`).on('value', snap => {
     if (!state.predictions[username]) state.predictions[username] = {};
     if (snap.exists()) state.predictions[username] = snap.val();
-    renderPredictions();
+    renderPredictions(); renderNextMatch();
   });
 }
 
@@ -400,6 +418,7 @@ async function doLogin() {
   if (name === ADMIN_USER && pin === ADMIN_PIN) document.getElementById('admin-toggle-btn').style.display = 'flex';
   
   renderPredictions();
+  renderNextMatch();
 }
 
 function doLogout() {
@@ -408,6 +427,7 @@ function doLogout() {
   document.getElementById('screen-home').classList.add('active');
   document.getElementById('login-name').value = ''; document.getElementById('login-pin').value = '';
   document.getElementById('admin-toggle-btn').style.display = 'none';
+  clearInterval(countdownTimer);
   switchTab('predictions');
 }
 
@@ -427,7 +447,6 @@ function toggleAdmin() { switchTab(document.getElementById('tab-panel-admin').st
 
 function isLocked(match) {
   if (state.results[match.id]) return true; // Bloqueado si hay resultado oficial
-  
   if (state.schedules[match.id]) {
     const now = new Date();
     const kickoff = new Date(state.schedules[match.id]);
@@ -441,6 +460,90 @@ function getMatchPoints(pred, real) {
   if (pred.h===real.h && pred.a===real.a) return {pts:3, label:`<span class="pts-badge pts-exact"><i class="ti ti-target"></i> +3 exact</span>`};
   if (Math.sign(real.h-real.a) === Math.sign(pred.h-pred.a)) return {pts:1, label:`<span class="pts-badge pts-result"><i class="ti ti-check"></i> +1 result</span>`};
   return {pts:0, label:`<span class="pts-none">0 pts</span>`};
+}
+
+// NUEVA FUNCIÓN: Lógica de la Cuenta Atrás
+let countdownTimer = null;
+function renderNextMatch() {
+  const banner = document.getElementById('next-match-banner');
+  if (!banner) return;
+  clearInterval(countdownTimer); // Limpiar temporizador anterior
+  
+  const uid = state.currentUser;
+  if (!uid) return;
+
+  const now = new Date().getTime();
+  let nextMatch = null;
+  let closestTime = Infinity;
+
+  // Buscar el partido más próximo
+  MATCHES.forEach(m => {
+    if (state.schedules && state.schedules[m.id]) {
+      const matchTime = new Date(state.schedules[m.id]).getTime();
+      if (matchTime > now && matchTime < closestTime) {
+        closestTime = matchTime;
+        nextMatch = m;
+      }
+    }
+  });
+
+  if (!nextMatch) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const matchTime = closestTime;
+  const pred = (state.predictions[uid] && state.predictions[uid][nextMatch.id]);
+  const predText = pred ? `${pred.h} - ${pred.a}` : 'No pick yet';
+
+  banner.style.display = 'block';
+  
+  const hFlag = FLAGS[nextMatch.home] ? `<img src="https://flagcdn.com/w20/${FLAGS[nextMatch.home]}.png" width="22" style="border-radius:2px; box-shadow:0 0 2px rgba(0,0,0,0.5);">` : '';
+  const aFlag = FLAGS[nextMatch.away] ? `<img src="https://flagcdn.com/w20/${FLAGS[nextMatch.away]}.png" width="22" style="border-radius:2px; box-shadow:0 0 2px rgba(0,0,0,0.5);">` : '';
+
+  banner.innerHTML = `
+    <div class="next-match-card">
+      <div class="nm-header">
+        <span><i class="ti ti-bolt"></i> NEXT MATCH</span>
+        <span>Grp ${nextMatch.g}</span>
+      </div>
+      <div class="nm-teams">
+        <div class="nm-team">${hFlag} <span>${nextMatch.home}</span></div>
+        <div class="nm-vs">VS</div>
+        <div class="nm-team right"><span>${nextMatch.away}</span> ${aFlag}</div>
+      </div>
+      <div class="nm-footer">
+        <div>Your pick: <b style="color:white; margin-left:4px;">${predText}</b></div>
+        <div class="nm-countdown"><i class="ti ti-clock-stop"></i> <span id="nm-timer">...</span></div>
+      </div>
+    </div>
+  `;
+
+  // Motor de la cuenta atrás
+  function updateTimer() {
+    const diff = matchTime - new Date().getTime();
+    if (diff <= 0) {
+      clearInterval(countdownTimer);
+      document.getElementById('nm-timer').textContent = "Started!";
+      setTimeout(renderNextMatch, 2000); // Recalcular el siguiente partido
+      return;
+    }
+    
+    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const s = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    let tStr = "";
+    if (d > 0) tStr += `${d}d `;
+    tStr += `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    
+    const el = document.getElementById('nm-timer');
+    if (el) el.textContent = tStr;
+  }
+  
+  updateTimer();
+  countdownTimer = setInterval(updateTimer, 1000);
 }
 
 function renderPredictions() {
@@ -489,7 +592,7 @@ async function savePredictions() {
   await db.ref(`predictions/${uid}`).set(state.predictions[uid]);
   const al = document.getElementById('alert-save');
   al.className = 'alert alert-success'; al.textContent = '✓ Predictions saved!'; al.style.display = 'block';
-  renderPredictions();
+  renderPredictions(); renderNextMatch(); // Refrescamos el banner
   setTimeout(() => al.style.display = 'none', 3000);
 }
 
@@ -497,7 +600,7 @@ async function renderLeaderboard() {
   const allPredsSnap = await db.ref('predictions').get();
   const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
   
-  // AQUÍ ESTÁ EL CAMBIO: Filtramos al admin para que no entre en la clasificación
+  // Filtramos al Admin
   const users = Object.keys(state.users).filter(u => u !== ADMIN_USER);
   
   const ranked = users.map(u => {
@@ -555,7 +658,6 @@ function renderResults() {
 function renderAdmin() {
   let html = '';
   
-  // SECCIÓN JUGADORES
   html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
     <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players</div>`;
   const users = Object.keys(state.users);
@@ -573,7 +675,6 @@ function renderAdmin() {
   }
   html += `</div>`;
 
-  // SECCIÓN RESULTADOS Y HORARIOS
   html += `<div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-ball-football"></i> Match Results & Schedules</div>`;
   MATCHES.forEach(m => {
     const real = state.results[m.id];
