@@ -10,7 +10,6 @@
 
   <style>
     :root {
-      /* Aquí definimos todas las variables que le faltaban a tu código */
       --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
       --color-background-primary: #ffffff;
       --color-background-secondary: #f8f9fa;
@@ -37,7 +36,6 @@
 
     #app { min-height: 600px; max-width: 600px; margin: 0 auto; padding: 1rem; }
 
-    /* Ocultar elementos para lectores de pantalla (como tu H2) */
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 
     .screen { display: none; padding: 1rem 0; }
@@ -68,7 +66,7 @@
 
     .field-group { margin-bottom: 12px; }
     .field-label { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 4px; display: block; font-weight: 500; }
-    input[type="text"], input[type="number"], input[type="password"] {
+    input[type="text"], input[type="number"], input[type="password"], input[type="datetime-local"] {
       width: 100%; padding: 8px 10px; border: 0.5px solid var(--color-border-secondary);
       border-radius: var(--border-radius-md); background: var(--color-background-secondary);
       color: var(--color-text-primary); font-size: 15px; font-family: var(--font-sans);
@@ -250,22 +248,14 @@
 
     <div id="tab-panel-admin" style="display:none">
       <div class="card">
-        <div class="card-title"><i class="ti ti-lock"></i> Admin — enter real scores</div>
-        <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:12px;">
-          Enter official results here. Global points update automatically.
-        </div>
+        <div class="card-title"><i class="ti ti-lock"></i> Admin — Panel</div>
         <div id="admin-list"></div>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
-<script>
-// --- 1. CONFIGURACIÓN FIREBASE (¡Pon aquí tus datos!) ---
-<!-- LIBRERÍAS DE FIREBASE -->
+<!-- LIBRERÍAS DE FIREBASE (¡Solo una vez!) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
@@ -301,22 +291,6 @@ const GROUPS = {
   'L': ['England', 'Croatia', 'Ghana', 'Panama']
 };
 
-// DICCIONARIO DE BANDERAS
-const FLAGS = {
-  'Mexico':'mx', 'South Africa':'za', 'South Korea':'kr', 'Czech Republic':'cz',
-  'Canada':'ca', 'Bosnia & Herz.':'ba', 'Qatar':'qa', 'Switzerland':'ch',
-  'Brazil':'br', 'Morocco':'ma', 'Haiti':'ht', 'Scotland':'gb-sct',
-  'USA':'us', 'Paraguay':'py', 'Australia':'au', 'Turkey':'tr',
-  'Germany':'de', 'Curaçao':'cw', 'Ivory Coast':'ci', 'Ecuador':'ec',
-  'Netherlands':'nl', 'Japan':'jp', 'Sweden':'se', 'Tunisia':'tn',
-  'Belgium':'be', 'Egypt':'eg', 'Iran':'ir', 'New Zealand':'nz',
-  'Spain':'es', 'Cape Verde':'cv', 'Saudi Arabia':'sa', 'Uruguay':'uy',
-  'France':'fr', 'Senegal':'sn', 'Iraq':'iq', 'Norway':'no',
-  'Argentina':'ar', 'Algeria':'dz', 'Austria':'at', 'Jordan':'jo',
-  'Portugal':'pt', 'DR Congo':'cd', 'Uzbekistan':'uz', 'Colombia':'co',
-  'England':'gb-eng', 'Croatia':'hr', 'Ghana':'gh', 'Panama':'pa'
-};
-
 const MATCHES = [];
 let matchId = 1;
 for (const [g, teams] of Object.entries(GROUPS)) {
@@ -330,12 +304,12 @@ for (const [g, teams] of Object.entries(GROUPS)) {
   });
 }
 
-// --- CONFIGURACIÓN ADMIN Y ESTADO ---
+// --- 3. CONFIGURACIÓN ADMIN Y ESTADO ---
 const ADMIN_PIN = '0000';
 const ADMIN_USER = 'Admin';
 let state = { users:{}, predictions:{}, results:{}, schedules:{}, currentUser:null };
 
-// --- 3. LÓGICA DE LA NUBE ---
+// --- 4. LÓGICA DE LA NUBE ---
 async function loadState() {
   const [usersSnap, resultsSnap, schedulesSnap] = await Promise.all([
     db.ref('users').get(), db.ref('results').get(), db.ref('schedules').get()
@@ -369,7 +343,7 @@ function attachListeners(username) {
   });
 }
 
-// --- FUNCIONES DE USUARIO ---
+// --- 5. FUNCIONES DE USUARIO ---
 async function doLogin() {
   const name = document.getElementById('login-name').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
@@ -409,7 +383,7 @@ function doLogout() {
   switchTab('predictions');
 }
 
-// --- RENDERIZADO DE PANTALLAS ---
+// --- 6. RENDERIZADO DE PANTALLAS ---
 function switchTab(tab) {
   ['predictions','leaderboard','results','admin'].forEach(t => {
     document.getElementById('tab-panel-'+t).style.display = t===tab ? 'block' : 'none';
@@ -422,18 +396,15 @@ function switchTab(tab) {
 }
 
 function toggleAdmin() { switchTab(document.getElementById('tab-panel-admin').style.display === 'none' ? 'admin' : 'predictions'); }
+
 function isLocked(match) {
-  if (state.results[match.id]) return true; // Bloqueado si hay resultado
+  if (state.results[match.id]) return true; // Bloqueado si hay resultado oficial
   
-  // Comprobamos la hora guardada en Firebase
   if (state.schedules[match.id]) {
     const now = new Date();
     const kickoff = new Date(state.schedules[match.id]);
-    return now >= kickoff;
+    return now >= kickoff; // Bloqueado si ya ha pasado la hora
   }
-  return false;
-}
-  
   return false;
 }
 
@@ -442,21 +413,6 @@ function getMatchPoints(pred, real) {
   if (pred.h===real.h && pred.a===real.a) return {pts:3, label:`<span class="pts-badge pts-exact"><i class="ti ti-target"></i> +3 exact</span>`};
   if (Math.sign(real.h-real.a) === Math.sign(pred.h-pred.a)) return {pts:1, label:`<span class="pts-badge pts-result"><i class="ti ti-check"></i> +1 result</span>`};
   return {pts:0, label:`<span class="pts-none">0 pts</span>`};
-}
-
-// Función Helper para dibujar las banderas
-function renderTeam(teamName, isAway = false) {
-  const code = FLAGS[teamName];
-  const imgHtml = code ? `<img src="https://flagcdn.com/w20/${code}.png" width="18" style="border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.3);">` : '';
-  return `<div class="team-name ${isAway ? 'right' : ''}" style="display:flex; align-items:center; gap:6px; justify-content:${isAway ? 'flex-end' : 'flex-start'}">
-    ${isAway ? teamName + imgHtml : imgHtml + teamName}
-  </div>`;
-}
-
-// Función Helper pequeña para listas (admin y resultados)
-function renderTeamSmall(teamName) {
-  const code = FLAGS[teamName];
-  return code ? `<img src="https://flagcdn.com/w20/${code}.png" width="14" style="border-radius:1px; margin:0 3px;"> ${teamName}` : teamName;
 }
 
 function renderPredictions() {
@@ -471,17 +427,17 @@ function renderPredictions() {
       html += `<div class="match-card">
         <div class="match-meta">${m.date} · Group ${m.g}</div>
         <div class="match-teams">
-          ${renderTeam(m.home, false)}
+          <span class="team-name">${m.home}</span>
           <div class="score-inputs">
             ${locked ? `<span class="saved-scores">${pred!==undefined?pred.h+'–'+pred.a:'–'}</span>` : 
             `<input type="number" class="score-input" id="ph-${m.id}" min="0" value="${pred!==undefined?pred.h:''}">
              <span class="score-sep">–</span>
              <input type="number" class="score-input" id="pa-${m.id}" min="0" value="${pred!==undefined?pred.a:''}">`}
           </div>
-          ${renderTeam(m.away, true)}
+          <span class="team-name right">${m.away}</span>
         </div>
-        ${locked ? `<div class="match-meta" style="margin-top:6px;"><i class="ti ti-lock"></i> Result: ${real.h}–${real.a}</div>` : ''}
-        ${locked && pred!==undefined ? `<div style="margin-top:2px;">${getMatchPoints(pred, real).label}</div>` : ''}
+        ${locked ? `<div class="match-meta" style="margin-top:6px;"><i class="ti ti-lock"></i> Result: ${real?real.h+'–'+real.a:'Locked (Match started)'}</div>` : ''}
+        ${real && pred!==undefined ? `<div style="margin-top:2px;">${getMatchPoints(pred, real).label}</div>` : ''}
       </div>`;
     });
   });
@@ -553,10 +509,8 @@ function renderResults() {
     const real = state.results[m.id], pred = userPreds[m.id];
     html += `<div class="leaderboard-row">
       <div style="flex:1; min-width:0;">
-        <div style="font-size:13px; font-weight:600; display:flex; align-items:center;">
-          ${renderTeamSmall(m.home)} <span style="margin:0 4px;">vs</span> ${renderTeamSmall(m.away)}
-        </div>
-        <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:4px;">
+        <div style="font-size:13px; font-weight:600;">${m.home} vs ${m.away}</div>
+        <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:2px;">
           Result: ${real.h}–${real.a} · Pick: ${pred!==undefined?pred.h+'–'+pred.a:'—'}
         </div>
       </div>
@@ -569,7 +523,7 @@ function renderResults() {
 function renderAdmin() {
   let html = '';
   
-  // SECCIÓN JUGADORES (Igual que antes)
+  // SECCIÓN JUGADORES
   html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
     <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players</div>`;
   const users = Object.keys(state.users);
@@ -615,18 +569,16 @@ function renderAdmin() {
   document.getElementById('admin-list').innerHTML = html;
 }
 
-// NUEVA FUNCIÓN: Guarda la hora en la base de datos
+// --- 7. FUNCIONES DE GUARDADO Y GESTIÓN ---
 async function saveTime(matchId) {
   const timeInput = document.getElementById('dt-'+matchId).value;
   if (timeInput) {
     await db.ref(`schedules/${matchId}`).set(timeInput);
   } else {
-    // Si borras el contenido y le das a guardar, eliminamos la restricción de hora
     await db.ref(`schedules/${matchId}`).remove();
   }
 }
 
-// FUNCIONES DE GUARDADO Y GESTIÓN
 async function saveResult(matchId) {
   const h = parseInt(document.getElementById('rh-'+matchId).value);
   const a = parseInt(document.getElementById('ra-'+matchId).value);
