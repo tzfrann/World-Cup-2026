@@ -333,24 +333,33 @@ for (const [g, teams] of Object.entries(GROUPS)) {
 // --- CONFIGURACIÓN ADMIN Y ESTADO ---
 const ADMIN_PIN = '0000';
 const ADMIN_USER = 'Admin';
-let state = { users:{}, predictions:{}, results:{}, currentUser:null };
+let state = { users:{}, predictions:{}, results:{}, schedules:{}, currentUser:null };
 
-// --- LÓGICA DE LA NUBE ---
+// --- 3. LÓGICA DE LA NUBE ---
 async function loadState() {
-  const [usersSnap, resultsSnap] = await Promise.all([db.ref('users').get(), db.ref('results').get()]);
+  const [usersSnap, resultsSnap, schedulesSnap] = await Promise.all([
+    db.ref('users').get(), db.ref('results').get(), db.ref('schedules').get()
+  ]);
   if (usersSnap.exists()) state.users = usersSnap.val();
   if (resultsSnap.exists()) state.results = resultsSnap.val();
+  if (schedulesSnap.exists()) state.schedules = schedulesSnap.val();
 }
 
-let resultsListener = null, predictionsListener = null;
+let resultsListener = null, predictionsListener = null, schedulesListener = null;
 
 function attachListeners(username) {
   if (resultsListener) db.ref('results').off('value', resultsListener);
+  if (schedulesListener) db.ref('schedules').off('value', schedulesListener);
   if (predictionsListener && state.currentUser) db.ref(`predictions/${state.currentUser}`).off('value', predictionsListener);
   
   resultsListener = db.ref('results').on('value', snap => {
     state.results = snap.exists() ? snap.val() : {};
     renderPredictions(); renderLeaderboard(); renderResults(); renderAdmin();
+  });
+
+  schedulesListener = db.ref('schedules').on('value', snap => {
+    state.schedules = snap.exists() ? snap.val() : {};
+    renderPredictions(); renderAdmin();
   });
 
   predictionsListener = db.ref(`predictions/${username}`).on('value', snap => {
