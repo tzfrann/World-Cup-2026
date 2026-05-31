@@ -265,6 +265,12 @@
 
 <script>
 // --- 1. CONFIGURACIÓN FIREBASE (¡Pon aquí tus datos!) ---
+<!-- LIBRERÍAS DE FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// --- 1. CONFIGURACIÓN FIREBASE ---
 const firebaseConfig = {
   apiKey: "AIzaSyBLXvum4HtxtcDkxSzoiHVSbq-NZoCu53M",
   authDomain: "world-cup-2026-predictio-fc7f0.firebaseapp.com",
@@ -275,6 +281,7 @@ const firebaseConfig = {
   appId: "1:586280154409:web:66d3bc0037b4dcad99b338",
   measurementId: "G-Z6TGSP6QVB"
 };
+
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -391,3 +398,141 @@ function getMatchPoints(pred, real) {
   if (!real) return {pts:0, label:`<span class="pts-none">pending</span>`};
   if (pred.h===real.h && pred.a===real.a) return {pts:3, label:`<span class="pts-badge pts-exact"><i class="ti ti-target"></i> +3 exact</span>`};
   if (Math.sign(real.h-real.a) === Math.sign(pred.h-pred.a)) return {pts:1, label:`<span class="pts-badge pts-result"><i class="ti ti-check"></i> +1 result</span>`};
+  return {pts:0, label:`<span class="pts-none">0 pts</span>`};
+}
+
+function renderPredictions() {
+  const uid = state.currentUser; const userPreds = state.predictions[uid] || {};
+  let groups = {}, html = '';
+  MATCHES.forEach(m => { if(!groups[m.g]) groups[m.g]=[]; groups[m.g].push(m); });
+  
+  Object.keys(groups).sort().forEach(g => {
+    html += `<div class="group-header">Group ${g}</div>`;
+    groups[g].forEach(m => {
+      const pred = userPreds[m.id], locked = isLocked(m), real = state.results[m.id];
+      html += `<div class="match-card">
+        <div class="match-meta">${m.date} · Group ${m.g}</div>
+        <div class="match-teams">
+          <span class="team-name">${m.home}</span>
+          <div class="score-inputs">
+            ${locked ? `<span class="saved-scores">${pred!==undefined?pred.h+'–'+pred.a:'–'}</span>` : 
+            `<input type="number" class="score-input" id="ph-${m.id}" min="0" value="${pred!==undefined?pred.h:''}">
+             <span class="score-sep">–</span>
+             <input type="number" class="score-input" id="pa-${m.id}" min="0" value="${pred!==undefined?pred.a:''}">`}
+          </div>
+          <span class="team-name right">${m.away}</span>
+        </div>
+        ${locked ? `<div class="match-meta" style="margin-top:6px;"><i class="ti ti-lock"></i> Result: ${real.h}–${real.a}</div>` : ''}
+        ${locked && pred!==undefined ? `<div style="margin-top:2px;">${getMatchPoints(pred, real).label}</div>` : ''}
+      </div>`;
+    });
+  });
+  document.getElementById('predictions-list').innerHTML = html;
+  
+  const filled = MATCHES.filter(m => userPreds[m.id]!==undefined && userPreds[m.id].h!=='' && userPreds[m.id].a!=='').length;
+  document.getElementById('pred-progress-label').textContent = `${filled} / ${MATCHES.length} predictions made`;
+  document.getElementById('pred-progress-bar').style.width = Math.round(filled/MATCHES.length*100)+'%';
+}
+
+async function savePredictions() {
+  const uid = state.currentUser; if (!state.predictions[uid]) state.predictions[uid] = {};
+  MATCHES.forEach(m => {
+    if (isLocked(m)) return;
+    const hEl = document.getElementById('ph-'+m.id), aEl = document.getElementById('pa-'+m.id);
+    if(hEl && aEl) {
+      const h = parseInt(hEl.value), a = parseInt(aEl.value);
+      if(!isNaN(h) && !isNaN(a)) state.predictions[uid][m.id] = {h,a};
+    }
+  });
+  await db.ref(`predictions/${uid}`).set(state.predictions[uid]);
+  const al = document.getElementById('alert-save');
+  al.className = 'alert alert-success'; al.textContent = '✓ Predictions saved!'; al.style.display = 'block';
+  renderPredictions();
+  setTimeout(() => al.style.display = 'none', 3000);
+}
+
+async function renderLeaderboard() {
+  const allPredsSnap = await db.ref('predictions').get();
+  const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
+  const users = Object.keys(state.users);
+  
+  const ranked = users.map(u => {
+    const userPreds = allPreds[u] || {};
+    let pts = 0, exact = 0, result = 0;
+    MATCHES.forEach(m => {
+      const real = state.results[m.id], pred = userPreds[m.id];
+      if (real && pred!==undefined) {
+        if (pred.h===real.h && pred.a===real.a) { pts+=3; exact++; }
+        else if (Math.sign(real.h-real.a) === Math.sign(pred.h-pred.a)) { pts+=1; result++; }
+      }
+    });
+    return { name: u, pts, exact, result };
+  }).sort((a,b) => b.pts - a.pts);
+
+  const resolved = MATCHES.filter(m => state.results[m.id]).length;
+  document.getElementById('lb-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Players</div><div class="stat-value">${users.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Matches Played</div><div class="stat-value">${resolved} / ${MATCHES.length}</div></div>`;
+
+  let html = '';
+  ranked.forEach((u,i) => {
+    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    html += `<div class="leaderboard-row">
+      <div class="rank ${rankClass}">${i+1}</div>
+      <div><div class="lb-name">${u.name}</div><div class="lb-exact">${u.exact} exact · ${u.result} result</div></div>
+      <div class="lb-pts">${u.pts} pts</div>
+    </div>`;
+  });
+  document.getElementById('leaderboard-list').innerHTML = html || '<div class="empty-state">No players yet.</div>';
+}
+
+function renderResults() {
+  const uid = state.currentUser, userPreds = state.predictions[uid] || {};
+  const resolved = MATCHES.filter(m=>state.results[m.id]);
+  if (!resolved.length) { document.getElementById('results-list').innerHTML='<div class="empty-state">No results entered yet.</div>'; return; }
+  let html='';
+  resolved.forEach(m => {
+    const real = state.results[m.id], pred = userPreds[m.id];
+    html += `<div class="leaderboard-row">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:13px; font-weight:600;">${m.home} vs ${m.away}</div>
+        <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:2px;">
+          Result: ${real.h}–${real.a} · Pick: ${pred!==undefined?pred.h+'–'+pred.a:'—'}
+        </div>
+      </div>
+      <div>${pred!==undefined ? getMatchPoints(pred,real).label : `<span class="pts-none">no prediction</span>`}</div>
+    </div>`;
+  });
+  document.getElementById('results-list').innerHTML=html;
+}
+
+function renderAdmin() {
+  let html='';
+  MATCHES.forEach(m => {
+    const real = state.results[m.id];
+    html += `<div class="match-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:13px; font-weight:500;">${m.home} vs ${m.away}</span>
+        <span style="font-size:11px; color:var(--color-text-tertiary);">${m.date}</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:6px;">
+        <input type="number" class="score-input" id="rh-${m.id}" value="${real?real.h:''}" placeholder="H">
+        <span class="score-sep">–</span>
+        <input type="number" class="score-input" id="ra-${m.id}" value="${real?real.a:''}" placeholder="A">
+        <button class="btn btn-sm btn-primary" onclick="saveResult(${m.id})">Save</button>
+        ${real?`<span style="color:var(--color-text-success); font-size:12px;"><i class="ti ti-circle-check"></i></span>`:''}
+      </div>
+    </div>`;
+  });
+  document.getElementById('admin-list').innerHTML=html;
+}
+
+async function saveResult(matchId) {
+  const h = parseInt(document.getElementById('rh-'+matchId).value), a = parseInt(document.getElementById('ra-'+matchId).value);
+  if (!isNaN(h) && !isNaN(a)) { await db.ref(`results/${matchId}`).set({ h, a }); renderAdmin(); }
+}
+
+loadState();
+</script>
+</body>
+</html>
