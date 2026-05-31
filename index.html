@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,7 +36,6 @@
     body { font-family: var(--font-sans); background: #f0f2f5; color: var(--color-text-primary); }
 
     #app { min-height: 600px; max-width: 600px; margin: 0 auto; padding: 1rem; }
-
     .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
 
     .screen { display: none; padding: 1rem 0; }
@@ -48,8 +48,7 @@
     .wc-badge {
       display: inline-flex; align-items: center; gap: 6px;
       background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary);
-      border-radius: 99px; padding: 4px 12px; font-size: 12px; color: var(--color-text-secondary);
-      margin-bottom: 12px;
+      border-radius: 99px; padding: 4px 12px; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px;
     }
     .wc-title { font-size: 26px; font-weight: 600; color: var(--color-text-primary); line-height: 1.2; }
     .wc-sub { font-size: 14px; color: var(--color-text-secondary); margin-top: 6px; }
@@ -104,13 +103,9 @@
       display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
     }
 
-    /* ESTILOS DEL NUEVO BANNER DE CUENTA ATRÁS */
     .next-match-card {
-      background: linear-gradient(135deg, var(--wc-dark) 0%, var(--wc-green) 100%);
-      border-radius: var(--border-radius-lg);
-      padding: 1.25rem;
-      color: white;
-      box-shadow: 0 4px 12px rgba(26, 107, 58, 0.2);
+      background: linear-gradient(135deg, var(--wc-dark) 0%, var(--wc-green) 100%); border-radius: var(--border-radius-lg);
+      padding: 1.25rem; color: white; box-shadow: 0 4px 12px rgba(26, 107, 58, 0.2);
     }
     .nm-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.7); margin-bottom: 12px; display:flex; justify-content: space-between; font-weight:600;}
     .nm-teams { display: flex; align-items: center; justify-content: space-between; font-size: 18px; font-weight: 600; margin-bottom: 16px;}
@@ -120,42 +115,25 @@
     .nm-footer { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: var(--border-radius-md); font-size: 13px;}
     .nm-countdown { font-weight: 600; color: #ffecb3; font-variant-numeric: tabular-nums; display:flex; gap:6px; align-items:center;}
 
-    .tab-bar {
-      display: flex; gap: 4px; background: var(--color-background-primary);
-      border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg);
-      padding: 4px; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .tab {
-      flex: 1; padding: 7px; border-radius: var(--border-radius-md); font-size: 13px; font-weight: 500;
-      text-align: center; cursor: pointer; color: var(--color-text-secondary); border: none; background: transparent; font-family: var(--font-sans);
-    }
+    .tab-bar { display: flex; gap: 4px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 4px; margin-bottom: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .tab { flex: 1; padding: 7px; border-radius: var(--border-radius-md); font-size: 13px; font-weight: 500; text-align: center; cursor: pointer; color: var(--color-text-secondary); border: none; background: transparent; font-family: var(--font-sans); }
     .tab.active { background: var(--color-background-secondary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); }
 
     .group-header { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .06em; padding: 8px 0 4px; margin-top: 8px; }
 
-    .match-card {
-      border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md);
-      padding: 10px 12px; margin-bottom: 8px; background: var(--color-background-primary);
-    }
+    .match-card { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 12px; margin-bottom: 8px; background: var(--color-background-primary); }
     .match-meta { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 6px; }
     .match-teams { display: flex; align-items: center; gap: 8px; }
     .team-name { flex: 1; font-size: 13px; font-weight: 500; color: var(--color-text-primary); }
     .team-name.right { text-align: right; }
     .score-inputs { display: flex; align-items: center; gap: 4px; }
-    .score-input {
-      width: 36px; height: 32px; text-align: center; border: 0.5px solid var(--color-border-secondary);
-      border-radius: var(--border-radius-md); background: var(--color-background-secondary);
-      color: var(--color-text-primary); font-size: 15px; font-weight: 600; padding: 0;
-    }
+    .score-input { width: 36px; height: 32px; text-align: center; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); background: var(--color-background-secondary); color: var(--color-text-primary); font-size: 15px; font-weight: 600; padding: 0; }
     .score-sep { font-size: 14px; color: var(--color-text-tertiary); }
     .saved-scores { font-size: 14px; font-weight: 600; color: var(--color-text-primary); }
 
     .leaderboard-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
     .leaderboard-row:last-child { border-bottom: none; }
-    .rank {
-      width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 600; background: var(--color-background-secondary); color: var(--color-text-secondary); flex-shrink: 0;
-    }
+    .rank { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; background: var(--color-background-secondary); color: var(--color-text-secondary); flex-shrink: 0; }
     .rank.gold { background: var(--wc-gold); color: #fff; }
     .rank.silver { background: #adb5bd; color: #fff; }
     .rank.bronze { background: #cd7f32; color: #fff; }
@@ -192,13 +170,18 @@
         <input type="text" id="login-name" placeholder="e.g. Carlos" autocomplete="off">
       </div>
       <div class="field-group">
+        <label class="field-label" for="login-league">League Name</label>
+        <input type="text" id="login-league" placeholder="e.g. Padel Friends, Family..." autocomplete="off">
+      </div>
+      <div class="field-group">
         <label class="field-label" for="login-pin">PIN (4 digits)</label>
         <input type="password" id="login-pin" placeholder="••••" maxlength="4" autocomplete="off">
       </div>
+      
       <div id="login-error" class="alert alert-error" style="display:none"></div>
       <button class="btn btn-primary" onclick="doLogin()"><i class="ti ti-login"></i> Sign in / Register</button>
       <div style="margin-top: 10px; font-size: 12px; color: var(--color-text-tertiary);">
-        New user? Entering a new name + PIN will register you automatically.
+        New user? Enter a name, league, and PIN to register automatically.
       </div>
     </div>
 
@@ -292,7 +275,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// --- 2. LOS 72 PARTIDOS (MUNDIAL 2026) ---
 const GROUPS = {
   'A': ['Mexico', 'South Africa', 'South Korea', 'Czech Republic'],
   'B': ['Canada', 'Bosnia & Herz.', 'Qatar', 'Switzerland'],
@@ -308,7 +290,6 @@ const GROUPS = {
   'L': ['England', 'Croatia', 'Ghana', 'Panama']
 };
 
-// DICCIONARIO DE BANDERAS Y FUNCIONES HELPER
 const FLAGS = {
   'Mexico':'mx', 'South Africa':'za', 'South Korea':'kr', 'Czech Republic':'cz',
   'Canada':'ca', 'Bosnia & Herz.':'ba', 'Qatar':'qa', 'Switzerland':'ch',
@@ -353,7 +334,7 @@ for (const [g, teams] of Object.entries(GROUPS)) {
 // --- 3. CONFIGURACIÓN ADMIN Y ESTADO ---
 const ADMIN_PIN = '0000';
 const ADMIN_USER = 'Admin';
-let state = { users:{}, predictions:{}, results:{}, schedules:{}, currentUser:null };
+let state = { users:{}, predictions:{}, results:{}, schedules:{}, currentUser:null, currentLeague:null }; // NUEVO: currentLeague
 
 // --- 4. LÓGICA DE LA NUBE ---
 async function loadState() {
@@ -389,10 +370,11 @@ function attachListeners(username) {
   });
 }
 
-// --- 5. FUNCIONES DE USUARIO ---
+// --- 5. FUNCIONES DE USUARIO ACTUALIZADAS ---
 async function doLogin() {
   const name = document.getElementById('login-name').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
+  let league = document.getElementById('login-league').value.trim();
   const errEl = document.getElementById('login-error');
 
   if (!name || pin.length !== 4) { errEl.textContent = 'Please enter a name and a 4-digit PIN.'; errEl.style.display = 'block'; return; }
@@ -400,29 +382,38 @@ async function doLogin() {
   const snap = await db.ref(`users/${name}`).get();
   if (snap.exists()) {
     if (snap.val().pin !== pin) { errEl.textContent = 'Incorrect PIN. Try again.'; errEl.style.display = 'block'; return; }
+    league = snap.val().league || 'Global'; // Carga su liga guardada
   } else {
-    const wantsToCreate = confirm(`El usuario "${name}" no existe. ¿Quieres crear una cuenta nueva con este nombre y el PIN introducido?`);
+    if (!league) league = 'Global'; // Por defecto si se le olvida
+    const wantsToCreate = confirm(`El usuario "${name}" no existe. ¿Quieres crear una cuenta nueva en la liga "${league}" con este PIN?`);
     if (!wantsToCreate) { errEl.textContent = 'Login cancelado.'; errEl.style.display = 'block'; return; }
-    await db.ref(`users/${name}`).set({ pin });
-    state.users[name] = { pin };
+    await db.ref(`users/${name}`).set({ pin, league });
+    state.users[name] = { pin, league };
   }
 
   const predSnap = await db.ref(`predictions/${name}`).get();
   state.predictions[name] = predSnap.exists() ? predSnap.val() : {};
 
-  errEl.style.display = 'none'; state.currentUser = name; attachListeners(name);
+  errEl.style.display = 'none'; state.currentUser = name; state.currentLeague = league;
+  attachListeners(name);
+  
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-main').classList.add('active');
-  document.getElementById('user-label').textContent = name;
-  document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
-  if (name === ADMIN_USER && pin === ADMIN_PIN) document.getElementById('admin-toggle-btn').style.display = 'flex';
   
-  renderPredictions();
-  renderNextMatch();
+  // Muestra la liga en la interfaz
+  document.getElementById('user-label').innerHTML = `${name} <span style="font-weight:400; font-size:11px; opacity:0.7;">(${league})</span>`;
+  document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
+  
+  if (name === ADMIN_USER && pin === ADMIN_PIN) {
+    document.getElementById('admin-toggle-btn').style.display = 'flex';
+    state.currentLeague = 'ADMIN'; // Admin no se filtra
+  }
+  
+  renderPredictions(); renderNextMatch();
 }
 
 function doLogout() {
-  state.currentUser = null;
+  state.currentUser = null; state.currentLeague = null;
   document.getElementById('screen-main').classList.remove('active');
   document.getElementById('screen-home').classList.add('active');
   document.getElementById('login-name').value = ''; document.getElementById('login-pin').value = '';
@@ -446,11 +437,11 @@ function switchTab(tab) {
 function toggleAdmin() { switchTab(document.getElementById('tab-panel-admin').style.display === 'none' ? 'admin' : 'predictions'); }
 
 function isLocked(match) {
-  if (state.results[match.id]) return true; // Bloqueado si hay resultado oficial
+  if (state.results[match.id]) return true;
   if (state.schedules[match.id]) {
     const now = new Date();
     const kickoff = new Date(state.schedules[match.id]);
-    return now >= kickoff; // Bloqueado si ya ha pasado la hora
+    return now >= kickoff;
   }
   return false;
 }
@@ -462,12 +453,11 @@ function getMatchPoints(pred, real) {
   return {pts:0, label:`<span class="pts-none">0 pts</span>`};
 }
 
-// NUEVA FUNCIÓN: Lógica de la Cuenta Atrás
 let countdownTimer = null;
 function renderNextMatch() {
   const banner = document.getElementById('next-match-banner');
   if (!banner) return;
-  clearInterval(countdownTimer); // Limpiar temporizador anterior
+  clearInterval(countdownTimer);
   
   const uid = state.currentUser;
   if (!uid) return;
@@ -476,21 +466,16 @@ function renderNextMatch() {
   let nextMatch = null;
   let closestTime = Infinity;
 
-  // Buscar el partido más próximo
   MATCHES.forEach(m => {
     if (state.schedules && state.schedules[m.id]) {
       const matchTime = new Date(state.schedules[m.id]).getTime();
       if (matchTime > now && matchTime < closestTime) {
-        closestTime = matchTime;
-        nextMatch = m;
+        closestTime = matchTime; nextMatch = m;
       }
     }
   });
 
-  if (!nextMatch) {
-    banner.style.display = 'none';
-    return;
-  }
+  if (!nextMatch) { banner.style.display = 'none'; return; }
 
   const matchTime = closestTime;
   const pred = (state.predictions[uid] && state.predictions[uid][nextMatch.id]);
@@ -519,16 +504,14 @@ function renderNextMatch() {
     </div>
   `;
 
-  // Motor de la cuenta atrás
   function updateTimer() {
     const diff = matchTime - new Date().getTime();
     if (diff <= 0) {
       clearInterval(countdownTimer);
       document.getElementById('nm-timer').textContent = "Started!";
-      setTimeout(renderNextMatch, 2000); // Recalcular el siguiente partido
+      setTimeout(renderNextMatch, 2000);
       return;
     }
-    
     const d = Math.floor(diff / (1000 * 60 * 60 * 24));
     const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -592,16 +575,19 @@ async function savePredictions() {
   await db.ref(`predictions/${uid}`).set(state.predictions[uid]);
   const al = document.getElementById('alert-save');
   al.className = 'alert alert-success'; al.textContent = '✓ Predictions saved!'; al.style.display = 'block';
-  renderPredictions(); renderNextMatch(); // Refrescamos el banner
+  renderPredictions(); renderNextMatch();
   setTimeout(() => al.style.display = 'none', 3000);
 }
 
+// LEADERBOARD CON FILTRO DE LIGAS
 async function renderLeaderboard() {
   const allPredsSnap = await db.ref('predictions').get();
   const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
   
-  // Filtramos al Admin
-  const users = Object.keys(state.users).filter(u => u !== ADMIN_USER);
+  // FILTRO CLAVE: Solo entran los jugadores que compartan liga contigo
+  const users = Object.keys(state.users).filter(u => 
+    u !== ADMIN_USER && state.users[u].league === state.currentLeague
+  );
   
   const ranked = users.map(u => {
     const userPreds = allPreds[u] || {};
@@ -618,7 +604,7 @@ async function renderLeaderboard() {
 
   const resolved = MATCHES.filter(m => state.results[m.id]).length;
   document.getElementById('lb-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-label">Players</div><div class="stat-value">${users.length}</div></div>
+    <div class="stat-card"><div class="stat-label">League Players</div><div class="stat-value">${users.length}</div></div>
     <div class="stat-card"><div class="stat-label">Matches Played</div><div class="stat-value">${resolved} / ${MATCHES.length}</div></div>`;
 
   let html = '';
@@ -630,7 +616,7 @@ async function renderLeaderboard() {
       <div class="lb-pts">${u.pts} pts</div>
     </div>`;
   });
-  document.getElementById('leaderboard-list').innerHTML = html || '<div class="empty-state">No players yet.</div>';
+  document.getElementById('leaderboard-list').innerHTML = html || '<div class="empty-state">No players in this league yet.</div>';
 }
 
 function renderResults() {
@@ -655,22 +641,33 @@ function renderResults() {
   document.getElementById('results-list').innerHTML=html;
 }
 
+// PANEL DE ADMIN CON AGRUPACIÓN DE LIGAS
 function renderAdmin() {
   let html = '';
   
   html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
-    <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players</div>`;
-  const users = Object.keys(state.users);
-  if (users.length <= 1) {
+    <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players by League</div>`;
+  
+  const users = Object.keys(state.users).filter(u => u !== ADMIN_USER);
+  if (users.length === 0) {
     html += `<div style="font-size:12px; color:var(--color-text-tertiary);">No other players registered yet.</div>`;
   } else {
+    // Agrupamos a los usuarios por su liga para visualizarlos mejor
+    const leagues = {};
     users.forEach(u => {
-      if (u !== ADMIN_USER) { 
+      const l = state.users[u].league || 'Global';
+      if(!leagues[l]) leagues[l] = [];
+      leagues[l].push(u);
+    });
+    
+    Object.keys(leagues).sort().forEach(l => {
+      html += `<div style="font-size:12px; font-weight:600; color:var(--color-text-secondary); margin:12px 0 6px;">LEAGUE: ${l.toUpperCase()}</div>`;
+      leagues[l].forEach(u => {
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
           <span style="font-size:13px; font-weight:500;">${u}</span>
           <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')"><i class="ti ti-trash"></i> Delete</button>
         </div>`;
-      }
+      });
     });
   }
   html += `</div>`;
@@ -707,11 +704,8 @@ function renderAdmin() {
 // --- 7. FUNCIONES DE GUARDADO Y GESTIÓN ---
 async function saveTime(matchId) {
   const timeInput = document.getElementById('dt-'+matchId).value;
-  if (timeInput) {
-    await db.ref(`schedules/${matchId}`).set(timeInput);
-  } else {
-    await db.ref(`schedules/${matchId}`).remove();
-  }
+  if (timeInput) { await db.ref(`schedules/${matchId}`).set(timeInput); } 
+  else { await db.ref(`schedules/${matchId}`).remove(); }
 }
 
 async function saveResult(matchId) {
@@ -733,8 +727,7 @@ async function deleteUser(username) {
   await db.ref(`predictions/${username}`).remove();
   delete state.users[username];
   delete state.predictions[username];
-  renderAdmin();
-  renderLeaderboard();
+  renderAdmin(); renderLeaderboard();
 }
 
 loadState();
