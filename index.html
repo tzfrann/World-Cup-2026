@@ -413,7 +413,19 @@ function switchTab(tab) {
 }
 
 function toggleAdmin() { switchTab(document.getElementById('tab-panel-admin').style.display === 'none' ? 'admin' : 'predictions'); }
-function isLocked(match) { return !!state.results[match.id]; }
+function isLocked(match) {
+  // 1. Si el Admin ya ha guardado un resultado final, se bloquea siempre
+  if (state.results[match.id]) return true;
+  
+  // 2. Si el partido tiene una hora programada, comprobamos si ya hemos pasado ese momento
+  if (match.datetime) {
+    const now = new Date(); // Hora actual exacta
+    const kickoff = new Date(match.datetime); // Hora del partido
+    return now >= kickoff; // Devuelve true si ya ha empezado
+  }
+  
+  return false;
+}
 
 function getMatchPoints(pred, real) {
   if (!real) return {pts:0, label:`<span class="pts-none">pending</span>`};
