@@ -476,7 +476,7 @@ async function doLogin() {
     
     if (userData.league && !userData.leagues) {
        userLeagues[userData.league] = true;
-       await db.ref(`users/${name}/leagues`).set(userLeagues);
+       await db.ref(`users/${name}`).set({ pin, leagues: userLeagues, nicknames: {} });
     } else if (userData.leagues) {
        userLeagues = userData.leagues;
     } else {
@@ -517,8 +517,8 @@ async function doLogin() {
         if (!wantsToCreate) return;
         
         userLeagues[leagueInput] = true;
-        await db.ref(`users/${name}`).set({ pin, leagues: userLeagues, nicknames: {} });
-        state.users[name] = { pin, leagues: userLeagues, nicknames: {} };
+        await db.ref(`users/${name}`).set({ pin, leagues: userLeagues, nicknames: {}, status: 'pending' });
+        state.users[name] = { pin, leagues: userLeagues, nicknames: {}, status: 'pending' };
         finalLeague = leagueInput;
     }
   }
