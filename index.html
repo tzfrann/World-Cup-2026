@@ -983,7 +983,7 @@ function renderAdmin() {
     leaguesList.forEach(l => {
       html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-secondary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
         <span style="font-size:13px; font-weight:600;">${l}</span>
-        ${l !== 'Admin' ? `<button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteLeague('${l}')"><i class="ti ti-trash"></i> Delete</button>` : ''}
+        <span style="font-size:11px; color:var(--color-text-tertiary);"><i class="ti ti-lock"></i> Bloqueada</span>
       </div>`;
     });
   }
