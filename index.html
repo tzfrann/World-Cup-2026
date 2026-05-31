@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -166,22 +165,22 @@
     <div class="card">
       <div class="card-title">Sign in</div>
       <div class="field-group">
-        <label class="field-label" for="login-name">Your name</label>
-        <input type="text" id="login-name" placeholder="e.g. Carlos" autocomplete="off">
+        <label class="field-label" for="login-name">Your Name</label>
+        <input type="text" id="login-name" autocomplete="off">
       </div>
       <div class="field-group">
         <label class="field-label" for="login-league">League Name</label>
-        <input type="text" id="login-league" placeholder="e.g. Padel Friends, Family..." autocomplete="off">
+        <input type="text" id="login-league" autocomplete="off">
       </div>
       <div class="field-group">
         <label class="field-label" for="login-pin">PIN (4 digits)</label>
-        <input type="password" id="login-pin" placeholder="••••" maxlength="4" autocomplete="off">
+        <input type="password" id="login-pin" maxlength="4" autocomplete="off">
       </div>
       
       <div id="login-error" class="alert alert-error" style="display:none"></div>
       <button class="btn btn-primary" onclick="doLogin()"><i class="ti ti-login"></i> Sign in / Register</button>
       <div style="margin-top: 10px; font-size: 12px; color: var(--color-text-tertiary);">
-        New user? Enter a name, league, and PIN to register automatically.
+        Si eres un usuario nuevo, introduce tu Nombre, Liga y PIN para registrarte (la liga debe haber sido creada por el Administrador).
       </div>
     </div>
 
@@ -334,23 +333,25 @@ for (const [g, teams] of Object.entries(GROUPS)) {
 // --- 3. CONFIGURACIÓN ADMIN Y ESTADO ---
 const ADMIN_PIN = '0000';
 const ADMIN_USER = 'Admin';
-let state = { users:{}, predictions:{}, results:{}, schedules:{}, currentUser:null, currentLeague:null }; // NUEVO: currentLeague
+let state = { users:{}, predictions:{}, results:{}, schedules:{}, leagues:{}, currentUser:null, currentLeague:null }; 
 
 // --- 4. LÓGICA DE LA NUBE ---
 async function loadState() {
-  const [usersSnap, resultsSnap, schedulesSnap] = await Promise.all([
-    db.ref('users').get(), db.ref('results').get(), db.ref('schedules').get()
+  const [usersSnap, resultsSnap, schedulesSnap, leaguesSnap] = await Promise.all([
+    db.ref('users').get(), db.ref('results').get(), db.ref('schedules').get(), db.ref('leagues').get()
   ]);
   if (usersSnap.exists()) state.users = usersSnap.val();
   if (resultsSnap.exists()) state.results = resultsSnap.val();
   if (schedulesSnap.exists()) state.schedules = schedulesSnap.val();
+  if (leaguesSnap.exists()) state.leagues = leaguesSnap.val();
 }
 
-let resultsListener = null, predictionsListener = null, schedulesListener = null;
+let resultsListener = null, predictionsListener = null, schedulesListener = null, leaguesListener = null;
 
 function attachListeners(username) {
   if (resultsListener) db.ref('results').off('value', resultsListener);
   if (schedulesListener) db.ref('schedules').off('value', schedulesListener);
+  if (leaguesListener) db.ref('leagues').off('value', leaguesListener);
   if (predictionsListener && state.currentUser) db.ref(`predictions/${state.currentUser}`).off('value', predictionsListener);
   
   resultsListener = db.ref('results').on('value', snap => {
@@ -361,6 +362,11 @@ function attachListeners(username) {
   schedulesListener = db.ref('schedules').on('value', snap => {
     state.schedules = snap.exists() ? snap.val() : {};
     renderPredictions(); renderAdmin(); renderNextMatch();
+  });
+
+  leaguesListener = db.ref('schedules').on('value', snap => {
+    state.leagues = snap.exists() ? snap.val() : {};
+    renderAdmin();
   });
 
   predictionsListener = db.ref(`predictions/${username}`).on('value', snap => {
@@ -374,19 +380,43 @@ function attachListeners(username) {
 async function doLogin() {
   const name = document.getElementById('login-name').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
-  let league = document.getElementById('login-league').value.trim();
+  const league = document.getElementById('login-league').value.trim();
   const errEl = document.getElementById('login-error');
 
-  if (!name || pin.length !== 4) { errEl.textContent = 'Please enter a name and a 4-digit PIN.'; errEl.style.display = 'block'; return; }
+  // Obligatorio rellenar los 3 campos
+  if (!name || !league || pin.length !== 4) { 
+    errEl.textContent = 'Debes introducir tu nombre, tu liga y un PIN de 4 dígitos.'; 
+    errEl.style.display = 'block'; 
+    return; 
+  }
+
+  // Identificamos si es el superusuario Admin
+  const isMasterAdmin = (name === ADMIN_USER && pin === ADMIN_PIN && league === 'Admin');
+
+  // Comprobación estricta de Ligas
+  if (!isMasterAdmin) {
+    if (!state.leagues || !state.leagues[league]) {
+      errEl.textContent = `La liga "${league}" no existe. Pídele al administrador que la cree.`; 
+      errEl.style.display = 'block'; 
+      return;
+    }
+  } else {
+    // Si entra el Admin, nos aseguramos de que su liga 'Admin' exista en la base de datos
+    if (!state.leagues || !state.leagues['Admin']) {
+        await db.ref('leagues/Admin').set(true);
+        if(!state.leagues) state.leagues = {};
+        state.leagues['Admin'] = true;
+    }
+  }
 
   const snap = await db.ref(`users/${name}`).get();
   if (snap.exists()) {
-    if (snap.val().pin !== pin) { errEl.textContent = 'Incorrect PIN. Try again.'; errEl.style.display = 'block'; return; }
-    league = snap.val().league || 'Global'; // Carga su liga guardada
+    const userData = snap.val();
+    if (userData.pin !== pin) { errEl.textContent = 'PIN incorrecto. Inténtalo de nuevo.'; errEl.style.display = 'block'; return; }
+    if (userData.league !== league) { errEl.textContent = `Perteneces a la liga "${userData.league}", no a "${league}".`; errEl.style.display = 'block'; return; }
   } else {
-    if (!league) league = 'Global'; // Por defecto si se le olvida
-    const wantsToCreate = confirm(`El usuario "${name}" no existe. ¿Quieres crear una cuenta nueva en la liga "${league}" con este PIN?`);
-    if (!wantsToCreate) { errEl.textContent = 'Login cancelado.'; errEl.style.display = 'block'; return; }
+    const wantsToCreate = confirm(`El usuario "${name}" no existe. ¿Quieres registrarte en la liga "${league}" con este PIN?`);
+    if (!wantsToCreate) { errEl.textContent = 'Registro cancelado.'; errEl.style.display = 'block'; return; }
     await db.ref(`users/${name}`).set({ pin, league });
     state.users[name] = { pin, league };
   }
@@ -400,13 +430,11 @@ async function doLogin() {
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-main').classList.add('active');
   
-  // Muestra la liga en la interfaz
   document.getElementById('user-label').innerHTML = `${name} <span style="font-weight:400; font-size:11px; opacity:0.7;">(${league})</span>`;
   document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
   
-  if (name === ADMIN_USER && pin === ADMIN_PIN) {
+  if (isMasterAdmin) {
     document.getElementById('admin-toggle-btn').style.display = 'flex';
-    state.currentLeague = 'ADMIN'; // Admin no se filtra
   }
   
   renderPredictions(); renderNextMatch();
@@ -416,7 +444,7 @@ function doLogout() {
   state.currentUser = null; state.currentLeague = null;
   document.getElementById('screen-main').classList.remove('active');
   document.getElementById('screen-home').classList.add('active');
-  document.getElementById('login-name').value = ''; document.getElementById('login-pin').value = '';
+  document.getElementById('login-name').value = ''; document.getElementById('login-pin').value = ''; document.getElementById('login-league').value = '';
   document.getElementById('admin-toggle-btn').style.display = 'none';
   clearInterval(countdownTimer);
   switchTab('predictions');
@@ -584,7 +612,7 @@ async function renderLeaderboard() {
   const allPredsSnap = await db.ref('predictions').get();
   const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
   
-  // FILTRO CLAVE: Solo entran los jugadores que compartan liga contigo
+  // Filtramos: Solo competidores de tu misma liga
   const users = Object.keys(state.users).filter(u => 
     u !== ADMIN_USER && state.users[u].league === state.currentLeague
   );
@@ -641,28 +669,49 @@ function renderResults() {
   document.getElementById('results-list').innerHTML=html;
 }
 
-// PANEL DE ADMIN CON AGRUPACIÓN DE LIGAS
+// PANEL DE ADMIN (CREAR LIGAS Y BORRAR USUARIOS)
 function renderAdmin() {
   let html = '';
   
+  // 1. SECCIÓN CREAR LIGAS
   html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
-    <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players by League</div>`;
+    <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-trophy"></i> Manage Leagues</div>
+    <div style="display:flex; gap:6px; margin-bottom:12px;">
+      <input type="text" id="new-league-name" class="score-input" style="flex:1; text-align:left; padding:8px;" placeholder="New league name...">
+      <button class="btn btn-sm btn-primary" onclick="createLeague()">Create</button>
+    </div>`;
+  
+  const leaguesList = state.leagues ? Object.keys(state.leagues) : [];
+  if (leaguesList.length === 0) {
+    html += `<div style="font-size:12px; color:var(--color-text-tertiary);">No leagues created yet.</div>`;
+  } else {
+    leaguesList.forEach(l => {
+      html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-secondary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
+        <span style="font-size:13px; font-weight:600;">${l}</span>
+        ${l !== 'Admin' ? `<button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteLeague('${l}')"><i class="ti ti-trash"></i> Delete</button>` : ''}
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // 2. SECCIÓN BORRAR JUGADORES
+  html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
+    <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players</div>`;
   
   const users = Object.keys(state.users).filter(u => u !== ADMIN_USER);
   if (users.length === 0) {
     html += `<div style="font-size:12px; color:var(--color-text-tertiary);">No other players registered yet.</div>`;
   } else {
-    // Agrupamos a los usuarios por su liga para visualizarlos mejor
-    const leagues = {};
+    const leaguesGroup = {};
     users.forEach(u => {
-      const l = state.users[u].league || 'Global';
-      if(!leagues[l]) leagues[l] = [];
-      leagues[l].push(u);
+      const l = state.users[u].league || 'Unknown';
+      if(!leaguesGroup[l]) leaguesGroup[l] = [];
+      leaguesGroup[l].push(u);
     });
     
-    Object.keys(leagues).sort().forEach(l => {
+    Object.keys(leaguesGroup).sort().forEach(l => {
       html += `<div style="font-size:12px; font-weight:600; color:var(--color-text-secondary); margin:12px 0 6px;">LEAGUE: ${l.toUpperCase()}</div>`;
-      leagues[l].forEach(u => {
+      leaguesGroup[l].forEach(u => {
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
           <span style="font-size:13px; font-weight:500;">${u}</span>
           <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')"><i class="ti ti-trash"></i> Delete</button>
@@ -672,6 +721,7 @@ function renderAdmin() {
   }
   html += `</div>`;
 
+  // 3. SECCIÓN RESULTADOS Y HORARIOS
   html += `<div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-ball-football"></i> Match Results & Schedules</div>`;
   MATCHES.forEach(m => {
     const real = state.results[m.id];
@@ -702,6 +752,21 @@ function renderAdmin() {
 }
 
 // --- 7. FUNCIONES DE GUARDADO Y GESTIÓN ---
+async function createLeague() {
+  const el = document.getElementById('new-league-name');
+  const lName = el.value.trim();
+  if (!lName) return;
+  if (state.leagues && state.leagues[lName]) { alert("Esta liga ya existe."); return; }
+  await db.ref(`leagues/${lName}`).set(true);
+  el.value = '';
+}
+
+async function deleteLeague(lName) {
+  const confirmDel = confirm(`¿Seguro que quieres borrar la liga "${lName}"? NOTA: Esto no borrará a los usuarios que estén dentro, solo eliminará la liga de la lista permitida.`);
+  if (!confirmDel) return;
+  await db.ref(`leagues/${lName}`).remove();
+}
+
 async function saveTime(matchId) {
   const timeInput = document.getElementById('dt-'+matchId).value;
   if (timeInput) { await db.ref(`schedules/${matchId}`).set(timeInput); } 
