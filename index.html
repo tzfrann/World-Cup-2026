@@ -798,24 +798,118 @@ async function renderLeaderboard() {
 }
 
 function renderResults() {
-  const uid = state.currentUser, userPreds = state.predictions[uid] || {};
-  const resolved = MATCHES.filter(m=>state.results[m.id]);
-  if (!resolved.length) { document.getElementById('results-list').innerHTML='<div class="empty-state">No results entered yet.</div>'; return; }
-  let html='';
-  resolved.forEach(m => {
-    const real = state.results[m.id], pred = userPreds[m.id];
-    html += `<div class="leaderboard-row">
-      <div style="flex:1; min-width:0;">
-        <div style="font-size:13px; font-weight:600; display:flex; align-items:center;">
-          ${renderTeamSmall(m.home)} <span style="margin:0 4px;">vs</span> ${renderTeamSmall(m.away)}
+  const uid = state.currentUser;
+  const userPreds = state.predictions[uid] || {};
+  
+  // Obtenemos los usuarios que están en la misma liga que tú para el desplegable
+  const leagueUsers = Object.keys(state.users).filter(u => 
+    u !== ADMIN_USER && state.users[u].leagues && state.users[u].leagues[state.currentLeague]
+  );
+
+  // Filtramos todos los partidos que ya han empezado o terminado
+  const lockedMatches = MATCHES.filter(m => isLocked(m));
+
+  if (!lockedMatches.length) { 
+    document.getElementById('results-list').innerHTML='<div class="empty-state">Aún no hay partidos en juego ni completados.</div>'; 
+    return; 
+  }
+  
+  let html = '';
+
+  // 1. PARTIDOS EN JUEGO (LIVE) - Formato grande rojo
+  const inPlayMatches = lockedMatches.filter(m => !state.results[m.id]);
+  if (inPlayMatches.length > 0) {
+    html += `<div style="font-size:12px; font-weight:600; color:var(--color-border-danger); margin-bottom:12px; display:flex; align-items:center; gap:4px;"><i class="ti ti-live-photo"></i> EN JUEGO (LIVE)</div>`;
+    
+    inPlayMatches.forEach(m => {
+      const pred = userPreds[m.id];
+      const predText = pred !== undefined ? `${pred.h} - ${pred.a}` : 'No apostaste';
+      const hFlag = FLAGS[m.home] ? `<img src="https://flagcdn.com/w20/${FLAGS[m.home]}.png" width="22" style="border-radius:2px; box-shadow:0 0 2px rgba(0,0,0,0.5);">` : '';
+      const aFlag = FLAGS[m.away] ? `<img src="https://flagcdn.com/w20/${FLAGS[m.away]}.png" width="22" style="border-radius:2px; box-shadow:0 0 2px rgba(0,0,0,0.5);">` : '';
+
+      // Construimos el desplegable de predicciones de la liga
+      let predictionsListHtml = `<div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.2); font-size:13px;">`;
+      leagueUsers.forEach(u => {
+        const displayNick = (state.users[u].nicknames && state.users[u].nicknames[state.currentLeague]) ? state.users[u].nicknames[state.currentLeague] : u;
+        const uPred = state.predictions[u] && state.predictions[u][m.id];
+        const uPredText = uPred !== undefined ? `${uPred.h} - ${uPred.a}` : '—';
+        predictionsListHtml += `<div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span>${displayNick}</span><b style="color:#ffecb3;">${uPredText}</b></div>`;
+      });
+      predictionsListHtml += `</div>`;
+
+      html += `
+        <div class="next-match-card" style="background: linear-gradient(135deg, #450a0a 0%, #c92a2a 100%); margin-bottom:16px;">
+          <div class="nm-header">
+            <span>Grp ${m.g}</span>
+            <span style="display:flex; align-items:center; gap:4px;"><span style="width:6px; height:6px; background:#fff; border-radius:50%; display:inline-block; animation: pulse 1.5s infinite;"></span> LIVE</span>
+          </div>
+          <div class="nm-teams">
+            <div class="nm-team">${hFlag} <span>${m.home}</span></div>
+            <div class="nm-vs">VS</div>
+            <div class="nm-team right"><span>${m.away}</span> ${aFlag}</div>
+          </div>
+          <div class="nm-footer" style="margin-bottom:12px;">
+            <div>Tu predicción: <b style="color:white; margin-left:4px;">${predText}</b></div>
+          </div>
+          
+          <details style="cursor:pointer; outline:none;">
+            <summary style="font-size:12px; opacity:0.9; font-weight:500; outline:none; user-select:none; display:inline-block;">Ver predicciones de la liga ▾</summary>
+            ${predictionsListHtml}
+          </details>
         </div>
-        <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:4px;">
-          Result: ${real.h}–${real.a} · Pick: ${pred!==undefined?pred.h+'–'+pred.a:'—'}
+      `;
+    });
+  }
+
+  // 2. PARTIDOS COMPLETADOS - Formato lista con desplegable
+  const completedMatches = lockedMatches.filter(m => state.results[m.id]);
+  if (completedMatches.length > 0) {
+    html += `<div style="font-size:12px; font-weight:600; color:var(--color-text-secondary); margin:16px 0 12px;">COMPLETADOS</div>`;
+    
+    completedMatches.forEach(m => {
+      const real = state.results[m.id];
+      const pred = userPreds[m.id];
+
+      // Construimos el desplegable para el partido terminado (incluye los puntos que ha ganado cada uno)
+      let predictionsListHtml = `<div style="margin-top:10px; padding-top:10px; border-top:0.5px dashed var(--color-border-tertiary); font-size:12px;">`;
+      leagueUsers.forEach(u => {
+        const displayNick = (state.users[u].nicknames && state.users[u].nicknames[state.currentLeague]) ? state.users[u].nicknames[state.currentLeague] : u;
+        const uPred = state.predictions[u] && state.predictions[u][m.id];
+        const uPredText = uPred !== undefined ? `${uPred.h} - ${uPred.a}` : '—';
+        const uPts = uPred !== undefined ? getMatchPoints(uPred, real).label : '';
+        
+        predictionsListHtml += `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <span style="color:var(--color-text-secondary);">${displayNick}</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <b>${uPredText}</b> ${uPts}
+            </div>
+          </div>`;
+      });
+      predictionsListHtml += `</div>`;
+
+      html += `
+      <div style="border-bottom: 0.5px solid var(--color-border-tertiary); padding: 12px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:600; display:flex; align-items:center;">
+              ${renderTeamSmall(m.home)} <span style="margin:0 4px;">vs</span> ${renderTeamSmall(m.away)}
+            </div>
+            <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:4px;">
+              Resultado: ${real.h}–${real.a} · Tu apuesta: ${pred!==undefined?pred.h+'–'+pred.a:'—'}
+            </div>
+          </div>
+          <div>${pred!==undefined ? getMatchPoints(pred,real).label : `<span class="pts-none">Sin apuesta</span>`}</div>
         </div>
-      </div>
-      <div>${pred!==undefined ? getMatchPoints(pred,real).label : `<span class="pts-none">no prediction</span>`}</div>
-    </div>`;
-  });
+        
+        <details style="cursor:pointer; margin-top:8px; outline:none;">
+          <summary style="font-size:12px; color:var(--color-border-info); font-weight:500; outline:none; user-select:none;">Ver predicciones de la liga ▾</summary>
+          ${predictionsListHtml}
+        </details>
+      </div>`;
+    });
+  }
+
   document.getElementById('results-list').innerHTML=html;
 }
 
