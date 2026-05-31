@@ -255,7 +255,6 @@
   </div>
 </div>
 
-<!-- LIBRERÍAS DE FIREBASE (¡Solo una vez!) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
@@ -290,6 +289,35 @@ const GROUPS = {
   'K': ['Portugal', 'DR Congo', 'Uzbekistan', 'Colombia'],
   'L': ['England', 'Croatia', 'Ghana', 'Panama']
 };
+
+// DICCIONARIO DE BANDERAS Y FUNCIONES HELPER
+const FLAGS = {
+  'Mexico':'mx', 'South Africa':'za', 'South Korea':'kr', 'Czech Republic':'cz',
+  'Canada':'ca', 'Bosnia & Herz.':'ba', 'Qatar':'qa', 'Switzerland':'ch',
+  'Brazil':'br', 'Morocco':'ma', 'Haiti':'ht', 'Scotland':'gb-sct',
+  'USA':'us', 'Paraguay':'py', 'Australia':'au', 'Turkey':'tr',
+  'Germany':'de', 'Curaçao':'cw', 'Ivory Coast':'ci', 'Ecuador':'ec',
+  'Netherlands':'nl', 'Japan':'jp', 'Sweden':'se', 'Tunisia':'tn',
+  'Belgium':'be', 'Egypt':'eg', 'Iran':'ir', 'New Zealand':'nz',
+  'Spain':'es', 'Cape Verde':'cv', 'Saudi Arabia':'sa', 'Uruguay':'uy',
+  'France':'fr', 'Senegal':'sn', 'Iraq':'iq', 'Norway':'no',
+  'Argentina':'ar', 'Algeria':'dz', 'Austria':'at', 'Jordan':'jo',
+  'Portugal':'pt', 'DR Congo':'cd', 'Uzbekistan':'uz', 'Colombia':'co',
+  'England':'gb-eng', 'Croatia':'hr', 'Ghana':'gh', 'Panama':'pa'
+};
+
+function renderTeam(teamName, isAway = false) {
+  const code = FLAGS[teamName];
+  const imgHtml = code ? `<img src="https://flagcdn.com/w20/${code}.png" width="18" style="border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.3);">` : '';
+  return `<div class="team-name ${isAway ? 'right' : ''}" style="display:flex; align-items:center; gap:6px; justify-content:${isAway ? 'flex-end' : 'flex-start'}">
+    ${isAway ? teamName + imgHtml : imgHtml + teamName}
+  </div>`;
+}
+
+function renderTeamSmall(teamName) {
+  const code = FLAGS[teamName];
+  return code ? `<img src="https://flagcdn.com/w20/${code}.png" width="14" style="border-radius:1px; margin:0 3px;"> ${teamName}` : teamName;
+}
 
 const MATCHES = [];
 let matchId = 1;
@@ -427,14 +455,14 @@ function renderPredictions() {
       html += `<div class="match-card">
         <div class="match-meta">${m.date} · Group ${m.g}</div>
         <div class="match-teams">
-          <span class="team-name">${m.home}</span>
+          ${renderTeam(m.home, false)}
           <div class="score-inputs">
             ${locked ? `<span class="saved-scores">${pred!==undefined?pred.h+'–'+pred.a:'–'}</span>` : 
             `<input type="number" class="score-input" id="ph-${m.id}" min="0" value="${pred!==undefined?pred.h:''}">
              <span class="score-sep">–</span>
              <input type="number" class="score-input" id="pa-${m.id}" min="0" value="${pred!==undefined?pred.a:''}">`}
           </div>
-          <span class="team-name right">${m.away}</span>
+          ${renderTeam(m.away, true)}
         </div>
         ${locked ? `<div class="match-meta" style="margin-top:6px;"><i class="ti ti-lock"></i> Result: ${real?real.h+'–'+real.a:'Locked (Match started)'}</div>` : ''}
         ${real && pred!==undefined ? `<div style="margin-top:2px;">${getMatchPoints(pred, real).label}</div>` : ''}
@@ -509,8 +537,10 @@ function renderResults() {
     const real = state.results[m.id], pred = userPreds[m.id];
     html += `<div class="leaderboard-row">
       <div style="flex:1; min-width:0;">
-        <div style="font-size:13px; font-weight:600;">${m.home} vs ${m.away}</div>
-        <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:2px;">
+        <div style="font-size:13px; font-weight:600; display:flex; align-items:center;">
+          ${renderTeamSmall(m.home)} <span style="margin:0 4px;">vs</span> ${renderTeamSmall(m.away)}
+        </div>
+        <div style="font-size:11px; color:var(--color-text-tertiary); margin-top:4px;">
           Result: ${real.h}–${real.a} · Pick: ${pred!==undefined?pred.h+'–'+pred.a:'—'}
         </div>
       </div>
@@ -549,7 +579,9 @@ function renderAdmin() {
     
     html += `<div class="match-card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-        <span style="font-size:13px; font-weight:500;">${m.home} vs ${m.away}</span>
+        <div style="font-size:13px; font-weight:500; display:flex; align-items:center;">
+          ${renderTeamSmall(m.home)} <span style="margin:0 4px;">vs</span> ${renderTeamSmall(m.away)}
+        </div>
         
         <div style="display:flex; gap:4px; align-items:center;">
           <input type="datetime-local" id="dt-${m.id}" value="${timeVal}" class="score-input" style="font-size:11px; padding:2px 6px; width:140px; height:26px;">
