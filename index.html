@@ -224,15 +224,14 @@
     <div id="tab-panel-predictions">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
         <div style="font-size:13px; color:var(--color-text-secondary);" id="pred-progress-label"></div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn btn-sm" style="color:var(--color-text-danger); border-color:var(--color-text-danger); background:transparent;" onclick="clearUnplayedPredictions()" title="Clear unplayed predictions">
-            <i class="ti ti-eraser"></i> Clear unlocked
-          </button>
-          <button class="btn btn-sm btn-primary" onclick="savePredictions()">
-            <i class="ti ti-device-floppy" aria-hidden="true"></i> Save all
-          </button>
-        </div>
+        <button class="btn btn-sm btn-primary" onclick="savePredictions()"><i class="ti ti-device-floppy"></i> Save all</button>
       </div>
+      <div class="progress-bar-wrap" style="margin-bottom:16px;">
+        <div class="progress-bar" id="pred-progress-bar" style="width:0%"></div>
+      </div>
+      <div id="alert-save" class="alert" style="display:none"></div>
+      <div id="predictions-list"></div>
+    </div>
 
     <div id="tab-panel-leaderboard" style="display:none">
       <div class="two-col" style="margin-bottom:1rem;" id="lb-stats"></div>
@@ -602,47 +601,6 @@ async function clearResult(matchId) {
   await db.ref(`results/${matchId}`).remove();
 }
 
-async function clearUnplayedPredictions() {
-  const uid = state.currentUser;
-  if (!uid || !state.predictions[uid]) return;
-
-  // Pedimos confirmación para evitar clics accidentales
-  const confirmClear = confirm("¿Seguro que quieres vaciar todas las casillas de los partidos que aún no tienen resultado oficial?");
-  if (!confirmClear) return;
-
-  let clearedCount = 0;
-  
-  // Recorremos los partidos y borramos solo los desbloqueados
-  MATCHES.forEach(m => {
-    if (!isLocked(m) && state.predictions[uid][m.id] !== undefined) {
-      delete state.predictions[uid][m.id];
-      clearedCount++;
-    }
-  });
-
-  if (clearedCount > 0) {
-    // Si la lista se queda completamente vacía, Firebase prefiere que usemos remove() en vez de set({})
-    if (Object.keys(state.predictions[uid]).length === 0) {
-      await db.ref(`predictions/${uid}`).remove();
-    } else {
-      await db.ref(`predictions/${uid}`).set(state.predictions[uid]);
-    }
-    
-    // Mostramos la alerta verde de éxito
-    const al = document.getElementById('alert-save');
-    al.className = 'alert alert-success'; 
-    al.textContent = `✓ ${clearedCount} predicciones borradas.`; 
-    al.style.display = 'block';
-    
-    // Refrescamos la pantalla para vaciar los inputs y actualizar la barra de progreso
-    renderPredictions();
-    
-    setTimeout(() => al.style.display = 'none', 3000);
-  } else {
-    alert("No tienes predicciones en partidos abiertos para borrar.");
-  }
-}  
-  
 async function deleteUser(username) {
   const confirmDelete = confirm(`¿Estás seguro de que quieres expulsar a "${username}"?\nSe borrarán todas sus predicciones y desaparecerá de la clasificación para siempre.`);
   if (!confirmDelete) return;
