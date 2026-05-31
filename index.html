@@ -754,10 +754,19 @@ function renderPredictions() {
            if (timeA && timeB) return timeA - timeB;
        }
        return a.id - b.id; // fallback al orden original
-    }).forEach(m => {
+  }).forEach(m => {
       const pred = userPreds[m.id], locked = isLocked(m), real = state.results[m.id];
+      
+      // Extraemos y formateamos la hora (ej: "11 jun, 21:00")
+      const timeString = state.schedules[m.id] 
+        ? new Date(state.schedules[m.id]).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) 
+        : 'Horario pendiente';
+
       html += `<div class="match-card">
-        <div class="match-meta">${m.date} · Grupo ${m.g}</div>
+        <div class="match-meta" style="display:flex; justify-content:space-between;">
+          <span>${m.date} · Grupo ${m.g}</span>
+          <span style="color:var(--color-border-info); font-weight:500;"><i class="ti ti-calendar-time"></i> ${timeString}</span>
+        </div>
         <div class="match-teams">
           ${renderTeam(m.home, false)}
           <div class="score-inputs">
