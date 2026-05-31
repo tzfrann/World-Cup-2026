@@ -423,15 +423,16 @@ function switchTab(tab) {
 
 function toggleAdmin() { switchTab(document.getElementById('tab-panel-admin').style.display === 'none' ? 'admin' : 'predictions'); }
 function isLocked(match) {
-  // 1. Si el Admin ya ha guardado un resultado final, se bloquea siempre
-  if (state.results[match.id]) return true;
+  if (state.results[match.id]) return true; // Bloqueado si hay resultado
   
-  // 2. Si el partido tiene una hora programada, comprobamos si ya hemos pasado ese momento
-  if (match.datetime) {
-    const now = new Date(); // Hora actual exacta
-    const kickoff = new Date(match.datetime); // Hora del partido
-    return now >= kickoff; // Devuelve true si ya ha empezado
+  // Comprobamos la hora guardada en Firebase
+  if (state.schedules[match.id]) {
+    const now = new Date();
+    const kickoff = new Date(state.schedules[match.id]);
+    return now >= kickoff;
   }
+  return false;
+}
   
   return false;
 }
@@ -567,9 +568,10 @@ function renderResults() {
 
 function renderAdmin() {
   let html = '';
+  
+  // SECCIÓN JUGADORES (Igual que antes)
   html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
     <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players</div>`;
-  
   const users = Object.keys(state.users);
   if (users.length <= 1) {
     html += `<div style="font-size:12px; color:var(--color-text-tertiary);">No other players registered yet.</div>`;
@@ -578,35 +580,50 @@ function renderAdmin() {
       if (u !== ADMIN_USER) { 
         html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
           <span style="font-size:13px; font-weight:500;">${u}</span>
-          <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')">
-            <i class="ti ti-trash"></i> Delete
-          </button>
+          <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')"><i class="ti ti-trash"></i> Delete</button>
         </div>`;
       }
     });
   }
   html += `</div>`;
 
-  html += `<div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-ball-football"></i> Match Results</div>`;
+  // SECCIÓN RESULTADOS Y HORARIOS
+  html += `<div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-ball-football"></i> Match Results & Schedules</div>`;
   MATCHES.forEach(m => {
     const real = state.results[m.id];
+    const timeVal = state.schedules[m.id] || '';
+    
     html += `<div class="match-card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <div style="font-size:13px; font-weight:500; display:flex; align-items:center;">
-          ${renderTeamSmall(m.home)} <span style="margin:0 4px;">vs</span> ${renderTeamSmall(m.away)}
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <span style="font-size:13px; font-weight:500;">${m.home} vs ${m.away}</span>
+        
+        <div style="display:flex; gap:4px; align-items:center;">
+          <input type="datetime-local" id="dt-${m.id}" value="${timeVal}" class="score-input" style="font-size:11px; padding:2px 6px; width:140px; height:26px;">
+          <button class="btn btn-sm" onclick="saveTime(${m.id})" style="padding:4px 8px; font-size:11px;">Set Time</button>
         </div>
-        <span style="font-size:11px; color:var(--color-text-tertiary);">${m.date}</span>
       </div>
+      
       <div style="display:flex; align-items:center; gap:6px;">
         <input type="number" class="score-input" id="rh-${m.id}" value="${real?real.h:''}" placeholder="H">
         <span class="score-sep">–</span>
         <input type="number" class="score-input" id="ra-${m.id}" value="${real?real.a:''}" placeholder="A">
-        <button class="btn btn-sm btn-primary" onclick="saveResult(${m.id})">Save</button>
+        <button class="btn btn-sm btn-primary" onclick="saveResult(${m.id})">Save Result</button>
         ${real ? `<button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="clearResult(${m.id})" title="Clear Result"><i class="ti ti-eraser"></i></button>` : ''}
       </div>
     </div>`;
   });
   document.getElementById('admin-list').innerHTML = html;
+}
+
+// NUEVA FUNCIÓN: Guarda la hora en la base de datos
+async function saveTime(matchId) {
+  const timeInput = document.getElementById('dt-'+matchId).value;
+  if (timeInput) {
+    await db.ref(`schedules/${matchId}`).set(timeInput);
+  } else {
+    // Si borras el contenido y le das a guardar, eliminamos la restricción de hora
+    await db.ref(`schedules/${matchId}`).remove();
+  }
 }
 
 // FUNCIONES DE GUARDADO Y GESTIÓN
