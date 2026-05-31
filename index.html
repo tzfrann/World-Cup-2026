@@ -364,7 +364,7 @@ function attachListeners(username) {
     renderPredictions(); renderAdmin(); renderNextMatch();
   });
 
-  leaguesListener = db.ref('schedules').on('value', snap => {
+  leaguesListener = db.ref('leagues').on('value', snap => {
     state.leagues = snap.exists() ? snap.val() : {};
     renderAdmin();
   });
