@@ -322,6 +322,9 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
 const MATCHES = [
   {id:1,g:'A',home:'Mexico',away:'Poland',date:'Jun 11'},{id:2,g:'A',home:'Saudi Arabia',away:'Argentina',date:'Jun 12'},
@@ -351,39 +354,159 @@ const MATCHES = [
 ];
 
 const ADMIN_PIN = '0000';
+
+// ─── 1. CONFIGURACIÓN FIREBASE ──────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.REGION.firebasedatabase.app",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ─── 2. ESTADO GLOBAL ────────────────────────────────────────────────────────
 let state = { users:{}, predictions:{}, results:{}, currentUser:null };
 
+// ─── 3. CARGA INICIAL Y LISTENERS ────────────────────────────────────────────
 async function loadState() {
-  try {
-    const r = await window.storage.get('wc2026_state');
-    if (r) state = JSON.parse(r.value);
-  } catch(e) {}
+  const [usersSnap, resultsSnap] = await Promise.all([
+    db.ref('users').get(),
+    db.ref('results').get()
+  ]);
+  if (usersSnap.exists())   state.users   = usersSnap.val();
+  if (resultsSnap.exists()) state.results = resultsSnap.val();
 }
 
-async function saveState() {
-  try { await window.storage.set('wc2026_state', JSON.stringify(state)); } catch(e) {}
+let resultsListener = null;
+let predictionsListener = null;
+
+function attachListeners(username) {
+  detachListeners();
+  
+  resultsListener = db.ref('results').on('value', snap => {
+    state.results = snap.exists() ? snap.val() : {};
+    if (document.getElementById('tab-panel-predictions').style.display !== 'none') renderPredictions();
+    if (document.getElementById('tab-panel-leaderboard').style.display !== 'none') renderLeaderboard();
+    if (document.getElementById('tab-panel-results').style.display !== 'none') renderResults();
+  });
+
+  predictionsListener = db.ref(`predictions/${username}`).on('value', snap => {
+    if (!state.predictions[username]) state.predictions[username] = {};
+    if (snap.exists()) state.predictions[username] = snap.val();
+    if (document.getElementById('tab-panel-predictions').style.display !== 'none') renderPredictions();
+    updateProgress();
+  });
 }
 
-function getInitials(name) {
-  return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+function detachListeners() {
+  if (resultsListener) db.ref('results').off('value', resultsListener);
+  if (predictionsListener && state.currentUser) db.ref(`predictions/${state.currentUser}`).off('value', predictionsListener);
+  resultsListener = null;
+  predictionsListener = null;
 }
 
-function calcPoints(userId) {
-  let pts=0, exact=0, result=0;
-  const userPreds = state.predictions[userId] || {};
+// ─── 4. FUNCIONES DE GUARDADO EN NUBE ────────────────────────────────────────
+async function saveUserRegistration(username, pin) {
+  await db.ref(`users/${username}`).set({ pin });
+}
+
+async function saveUserPredictions(username, predictions) {
+  await db.ref(`predictions/${username}`).set(predictions);
+}
+
+async function saveResult(matchId) {
+  const h = parseInt(document.getElementById('rh-' + matchId).value);
+  const a = parseInt(document.getElementById('ra-' + matchId).value);
+  if (isNaN(h) || isNaN(a) || h < 0 || a < 0) return;
+  await db.ref(`results/${matchId}`).set({ h, a });
+  renderAdmin();
+}
+
+// ─── 5. LÓGICA DE USUARIO Y PUNTOS ───────────────────────────────────────────
+async function doLogin() {
+  const name = document.getElementById('login-name').value.trim();
+  const pin  = document.getElementById('login-pin').value.trim();
+  const errEl = document.getElementById('login-error');
+
+  if (!name || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    errEl.textContent = 'Please enter your name and a 4-digit PIN.';
+    errEl.style.display = '';
+    return;
+  }
+
+  const snap = await db.ref(`users/${name}`).get();
+  if (snap.exists()) {
+    if (snap.val().pin !== pin) {
+      errEl.textContent = 'Incorrect PIN for this name. Try again.';
+      errEl.style.display = '';
+      return;
+    }
+  } else {
+    await saveUserRegistration(name, pin);
+    state.users[name] = { pin };
+  }
+
+  const predSnap = await db.ref(`predictions/${name}`).get();
+  state.predictions[name] = predSnap.exists() ? predSnap.val() : {};
+
+  errEl.style.display = 'none';
+  state.currentUser = name;
+  attachListeners(name);
+
+  document.getElementById('screen-home').classList.remove('active');
+  document.getElementById('screen-main').classList.add('active');
+  document.getElementById('user-label').textContent = name;
+  document.getElementById('user-avatar').textContent = getInitials(name);
+  if (pin === ADMIN_PIN) document.getElementById('admin-toggle-btn').style.display = '';
+  renderPredictions();
+}
+
+function doLogout() {
+  detachListeners();
+  state.currentUser = null;
+  document.getElementById('screen-main').classList.remove('active');
+  document.getElementById('screen-home').classList.add('active');
+  document.getElementById('login-name').value  = '';
+  document.getElementById('login-pin').value   = '';
+  document.getElementById('admin-toggle-btn').style.display = 'none';
+  switchTab('predictions');
+}
+
+async function savePredictions() {
+  const uid = state.currentUser;
+  if (!state.predictions[uid]) state.predictions[uid] = {};
+  let saved = 0;
+
   MATCHES.forEach(m => {
-    const real = state.results[m.id];
-    const pred = userPreds[m.id];
-    if (!real || pred===undefined || pred===null) return;
-    if (pred.h===real.h && pred.a===real.a) { pts+=3; exact++; }
-    else {
-      const rs = Math.sign(real.h-real.a), ps = Math.sign(pred.h-pred.a);
-      if (rs===ps) { pts+=1; result++; }
+    if (isLocked(m)) return;
+    const hEl = document.getElementById('ph-' + m.id);
+    const aEl = document.getElementById('pa-' + m.id);
+    if (!hEl || !aEl) return;
+    const h = parseInt(hEl.value), a = parseInt(aEl.value);
+    if (!isNaN(h) && !isNaN(a) && h >= 0 && a >= 0) {
+      state.predictions[uid][m.id] = { h, a };
+      saved++;
     }
   });
-  return {pts,exact,result};
+
+  await saveUserPredictions(uid, state.predictions[uid]);
+
+  const al = document.getElementById('alert-save');
+  al.className = 'alert alert-success';
+  al.textContent = `✓ ${saved} predictions saved!`;
+  al.style.display = '';
+  updateProgress();
+  setTimeout(() => { al.style.display = 'none'; }, 3000);
 }
 
+// ─── 6. FUNCIONES DE UI INTACTAS ─────────────────────────────────────────────
+function getInitials(name) { return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function isLocked(match) { return !!state.results[match.id]; }
 function switchTab(tab) {
   ['predictions','leaderboard','results','admin'].forEach(t => {
     document.getElementById('tab-panel-'+t).style.display = t===tab ? '' : 'none';
@@ -394,43 +517,6 @@ function switchTab(tab) {
   if (tab==='results') renderResults();
   if (tab==='admin') renderAdmin();
 }
-
-function doLogin() {
-  const name = document.getElementById('login-name').value.trim();
-  const pin = document.getElementById('login-pin').value.trim();
-  const errEl = document.getElementById('login-error');
-  if (!name || pin.length!==4 || !/^\d{4}$/.test(pin)) {
-    errEl.textContent = 'Please enter your name and a 4-digit PIN.';
-    errEl.style.display = '';
-    return;
-  }
-  if (state.users[name] && state.users[name] !== pin) {
-    errEl.textContent = 'Incorrect PIN for this name. Try again.';
-    errEl.style.display = '';
-    return;
-  }
-  errEl.style.display = 'none';
-  if (!state.users[name]) state.users[name] = pin;
-  state.currentUser = name;
-  saveState();
-  document.getElementById('screen-home').classList.remove('active');
-  document.getElementById('screen-main').classList.add('active');
-  document.getElementById('user-label').textContent = name;
-  document.getElementById('user-avatar').textContent = getInitials(name);
-  if (pin === ADMIN_PIN) document.getElementById('admin-toggle-btn').style.display = '';
-  renderPredictions();
-}
-
-function doLogout() {
-  state.currentUser = null;
-  document.getElementById('screen-main').classList.remove('active');
-  document.getElementById('screen-home').classList.add('active');
-  document.getElementById('login-name').value='';
-  document.getElementById('login-pin').value='';
-  document.getElementById('admin-toggle-btn').style.display='none';
-  switchTab('predictions');
-}
-
 function toggleAdmin() {
   const p = document.getElementById('tab-panel-admin');
   if (p.style.display==='none'||!p.style.display) {
@@ -440,11 +526,24 @@ function toggleAdmin() {
     switchTab('predictions');
   }
 }
-
-function isLocked(match) {
-  return !!state.results[match.id];
+function getMatchPoints(pred, real) {
+  if (!real) return {pts:0,label:`<span class="pts-none">pending</span>`};
+  if (pred.h===real.h && pred.a===real.a) return {pts:3,label:`<span class="pts-badge pts-exact">+3 exact score</span>`};
+  const rs=Math.sign(real.h-real.a), ps=Math.sign(pred.h-pred.a);
+  if (rs===ps) return {pts:1,label:`<span class="pts-badge pts-result">+1 correct result</span>`};
+  return {pts:0,label:`<span class="pts-none">0 pts</span>`};
 }
-
+function updateProgress() {
+  const uid = state.currentUser;
+  const userPreds = state.predictions[uid] || {};
+  const total = MATCHES.length;
+  const filled = MATCHES.filter(m => {
+    const p = userPreds[m.id];
+    return p!==undefined && p.h!=='' && p.a!=='';
+  }).length;
+  document.getElementById('pred-progress-label').textContent = `${filled} / ${total} predictions made`;
+  document.getElementById('pred-progress-bar').style.width = Math.round(filled/total*100)+'%';
+}
 function renderPredictions() {
   const uid = state.currentUser;
   const userPreds = state.predictions[uid] || {};
@@ -483,74 +582,6 @@ function renderPredictions() {
   document.getElementById('predictions-list').innerHTML = html;
   updateProgress();
 }
-
-function getMatchPoints(pred, real) {
-  if (!real) return {pts:0,label:`<span class="pts-none">pending</span>`};
-  if (pred.h===real.h && pred.a===real.a) return {pts:3,label:`<span class="pts-badge pts-exact">+3 exact score</span>`};
-  const rs=Math.sign(real.h-real.a), ps=Math.sign(pred.h-pred.a);
-  if (rs===ps) return {pts:1,label:`<span class="pts-badge pts-result">+1 correct result</span>`};
-  return {pts:0,label:`<span class="pts-none">0 pts</span>`};
-}
-
-function updateProgress() {
-  const uid = state.currentUser;
-  const userPreds = state.predictions[uid] || {};
-  const total = MATCHES.length;
-  const filled = MATCHES.filter(m => {
-    const p = userPreds[m.id];
-    return p!==undefined && p.h!=='' && p.a!=='';
-  }).length;
-  document.getElementById('pred-progress-label').textContent = `${filled} / ${total} predictions made`;
-  document.getElementById('pred-progress-bar').style.width = Math.round(filled/total*100)+'%';
-}
-
-function savePredictions() {
-  const uid = state.currentUser;
-  if (!state.predictions[uid]) state.predictions[uid] = {};
-  let saved=0;
-  MATCHES.forEach(m => {
-    if (isLocked(m)) return;
-    const hEl = document.getElementById('ph-'+m.id);
-    const aEl = document.getElementById('pa-'+m.id);
-    if (!hEl||!aEl) return;
-    const h = parseInt(hEl.value), a = parseInt(aEl.value);
-    if (!isNaN(h) && !isNaN(a) && h>=0 && a>=0) {
-      state.predictions[uid][m.id] = {h,a};
-      saved++;
-    }
-  });
-  saveState();
-  const al = document.getElementById('alert-save');
-  al.className = 'alert alert-success';
-  al.textContent = `✓ ${saved} predictions saved!`;
-  al.style.display = '';
-  updateProgress();
-  setTimeout(()=>{ al.style.display='none'; }, 3000);
-}
-
-function renderLeaderboard() {
-  const users = Object.keys(state.users);
-  if (!users.length) { document.getElementById('leaderboard-list').innerHTML='<div class="empty-state">No players yet.</div>'; return; }
-  const ranked = users.map(u => ({name:u,...calcPoints(u)})).sort((a,b)=>b.pts-a.pts);
-  const totalResolved = MATCHES.filter(m=>state.results[m.id]).length;
-  document.getElementById('lb-stats').innerHTML =
-    `<div class="stat-card"><div class="stat-label">Players</div><div class="stat-value">${users.length}</div></div>
-     <div class="stat-card"><div class="stat-label">Matches resolved</div><div class="stat-value">${totalResolved} / ${MATCHES.length}</div></div>`;
-  let html='';
-  ranked.forEach((u,i) => {
-    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
-    html += `<div class="leaderboard-row">
-      <div class="rank ${rankClass}">${i+1}</div>
-      <div>
-        <div class="lb-name">${u.name}</div>
-        <div class="lb-exact">${u.exact} exact &nbsp;·&nbsp; ${u.result} correct result</div>
-      </div>
-      <div class="lb-pts">${u.pts} pts</div>
-    </div>`;
-  });
-  document.getElementById('leaderboard-list').innerHTML=html;
-}
-
 function renderResults() {
   const uid = state.currentUser;
   const userPreds = state.predictions[uid] || {};
@@ -577,7 +608,6 @@ function renderResults() {
   });
   document.getElementById('results-list').innerHTML=html;
 }
-
 function renderAdmin() {
   let html='';
   MATCHES.forEach(m => {
@@ -602,15 +632,54 @@ function renderAdmin() {
   document.getElementById('admin-list').innerHTML=html;
 }
 
-function saveResult(matchId) {
-  const h = parseInt(document.getElementById('rh-'+matchId).value);
-  const a = parseInt(document.getElementById('ra-'+matchId).value);
-  if (isNaN(h)||isNaN(a)||h<0||a<0) return;
-  state.results[matchId] = {h,a};
-  saveState();
-  renderAdmin();
-  renderPredictions();
+// ─── 7. LEADERBOARD ACTUALIZADO (NUBE) ───────────────────────────────────────
+async function renderLeaderboard() {
+  const allPredsSnap = await db.ref('predictions').get();
+  const allPreds = allPredsSnap.exists() ? allPredsSnap.val() : {};
+  const users = Object.keys(state.users);
+  
+  if (!users.length) {
+    document.getElementById('leaderboard-list').innerHTML = '<div class="empty-state">No players yet.</div>';
+    return;
+  }
+
+  const ranked = users.map(u => {
+    const userPreds = allPreds[u] || {};
+    let pts = 0, exact = 0, result = 0;
+    MATCHES.forEach(m => {
+      const real = state.results[m.id];
+      const pred = userPreds[m.id];
+      if (!real || pred === undefined) return;
+      if (pred.h === real.h && pred.a === real.a) { pts += 3; exact++; }
+      else {
+        const rs = Math.sign(real.h - real.a), ps = Math.sign(pred.h - pred.a);
+        if (rs === ps) { pts += 1; result++; }
+      }
+    });
+    return { name: u, pts, exact, result };
+  }).sort((a, b) => b.pts - a.pts);
+
+  const totalResolved = MATCHES.filter(m => state.results[m.id]).length;
+  document.getElementById('lb-stats').innerHTML =
+    `<div class="stat-card"><div class="stat-label">Players</div><div class="stat-value">${users.length}</div></div>
+     <div class="stat-card"><div class="stat-label">Matches resolved</div><div class="stat-value">${totalResolved} / ${MATCHES.length}</div></div>`;
+
+  let html = '';
+  ranked.forEach((u, i) => {
+    const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    html += `<div class="leaderboard-row">
+      <div class="rank ${rankClass}">${i + 1}</div>
+      <div>
+        <div class="lb-name">${u.name}</div>
+        <div class="lb-exact">${u.exact} exact &nbsp;·&nbsp; ${u.result} correct result</div>
+      </div>
+      <div class="lb-pts">${u.pts} pts</div>
+    </div>`;
+  });
+  document.getElementById('leaderboard-list').innerHTML = html;
 }
 
-loadState().then(()=>{});
+loadState().then(() => {
+  // App iniciada y conectada
+});
 </script>
