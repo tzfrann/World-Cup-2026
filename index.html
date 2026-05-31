@@ -386,63 +386,92 @@ function attachListeners(username) {
 }
 
 // --- 5. FUNCIONES DE USUARIO ACTUALIZADAS ---
+// --- 5. FUNCIONES DE USUARIO ACTUALIZADAS ---
 async function doLogin() {
   const name = document.getElementById('login-name').value.trim();
   const pin  = document.getElementById('login-pin').value.trim();
+  const leagueGroup = document.getElementById('league-group');
   const league = document.getElementById('login-league').value.trim();
   const errEl = document.getElementById('login-error');
 
-  // Obligatorio rellenar los 3 campos
-  if (!name || !league || pin.length !== 4) { 
-    errEl.textContent = 'Debes introducir tu nombre, tu liga y un PIN de 4 dígitos.'; 
+  // Ahora solo exigimos Nombre y PIN para el primer clic
+  if (!name || pin.length !== 4) { 
+    errEl.className = 'alert alert-error';
+    errEl.textContent = 'Debes introducir tu nombre y un PIN de 4 dígitos.'; 
     errEl.style.display = 'block'; 
     return; 
   }
 
-  // Identificamos si es el superusuario Admin
-  const isMasterAdmin = (name === ADMIN_USER && pin === ADMIN_PIN && league === 'Admin');
-
-  // Comprobación estricta de Ligas
-  if (!isMasterAdmin) {
-    if (!state.leagues || !state.leagues[league]) {
-      errEl.textContent = `La liga "${league}" no existe. Pídele al administrador que la cree.`; 
-      errEl.style.display = 'block'; 
-      return;
-    }
-  } else {
-    // Si entra el Admin, nos aseguramos de que su liga 'Admin' exista en la base de datos
-    if (!state.leagues || !state.leagues['Admin']) {
-        await db.ref('leagues/Admin').set(true);
-        if(!state.leagues) state.leagues = {};
-        state.leagues['Admin'] = true;
-    }
-  }
-
+  let finalLeague = league;
   const snap = await db.ref(`users/${name}`).get();
+  
   if (snap.exists()) {
+    // EL USUARIO YA EXISTE -> Entra directo
     const userData = snap.val();
-    if (userData.pin !== pin) { errEl.textContent = 'PIN incorrecto. Inténtalo de nuevo.'; errEl.style.display = 'block'; return; }
-    if (userData.league !== league) { errEl.textContent = `Perteneces a la liga "${userData.league}", no a "${league}".`; errEl.style.display = 'block'; return; }
+    if (userData.pin !== pin) { 
+        errEl.className = 'alert alert-error';
+        errEl.textContent = 'PIN incorrecto. Inténtalo de nuevo.'; 
+        errEl.style.display = 'block'; 
+        return; 
+    }
+    finalLeague = userData.league || 'Global';
   } else {
-    const wantsToCreate = confirm(`El usuario "${name}" no existe. ¿Quieres registrarte en la liga "${league}" con este PIN?`);
-    if (!wantsToCreate) { errEl.textContent = 'Registro cancelado.'; errEl.style.display = 'block'; return; }
-    await db.ref(`users/${name}`).set({ pin, league });
-    state.users[name] = { pin, league };
+    // EL USUARIO ES NUEVO
+    if (leagueGroup.style.display === 'none') {
+        // Primer intento: Desplegamos la caja de la liga
+        leagueGroup.style.display = 'block';
+        errEl.className = 'alert alert-success';
+        errEl.textContent = `¡Hola ${name}! Como eres nuevo, escribe abajo a qué liga quieres unirte y vuelve a pulsar Sign in.`;
+        errEl.style.display = 'block';
+        return;
+    } else {
+        // Segundo intento: Ya tiene la caja de liga a la vista y la ha rellenado
+        if (!league) {
+            errEl.className = 'alert alert-error';
+            errEl.textContent = 'Por favor, escribe el nombre de la liga para registrarte.';
+            return;
+        }
+        
+        const isMasterAdmin = (name === ADMIN_USER && pin === ADMIN_PIN && league === 'Admin');
+        
+        if (!isMasterAdmin) {
+            if (!state.leagues || !state.leagues[league]) {
+              errEl.className = 'alert alert-error';
+              errEl.textContent = `La liga "${league}" no existe. Pídele al administrador que la cree.`; 
+              return;
+            }
+        } else {
+            // El Super Admin se crea su propia liga si no existe
+            if (!state.leagues || !state.leagues['Admin']) {
+                await db.ref('leagues/Admin').set(true);
+                if(!state.leagues) state.leagues = {};
+                state.leagues['Admin'] = true;
+            }
+        }
+        
+        const wantsToCreate = confirm(`¿Quieres registrar la cuenta "${name}" en la liga "${league}"?`);
+        if (!wantsToCreate) return;
+        
+        await db.ref(`users/${name}`).set({ pin, league });
+        state.users[name] = { pin, league };
+        finalLeague = league;
+    }
   }
 
+  // FLUJO FINAL DE LOGIN PARA TODOS (Nuevos y antiguos)
   const predSnap = await db.ref(`predictions/${name}`).get();
   state.predictions[name] = predSnap.exists() ? predSnap.val() : {};
 
-  errEl.style.display = 'none'; state.currentUser = name; state.currentLeague = league;
+  errEl.style.display = 'none'; state.currentUser = name; state.currentLeague = finalLeague;
   attachListeners(name);
   
   document.getElementById('screen-home').classList.remove('active');
   document.getElementById('screen-main').classList.add('active');
   
-  document.getElementById('user-label').innerHTML = `${name} <span style="font-weight:400; font-size:11px; opacity:0.7;">(${league})</span>`;
+  document.getElementById('user-label').innerHTML = `${name} <span style="font-weight:400; font-size:11px; opacity:0.7;">(${finalLeague})</span>`;
   document.getElementById('user-avatar').textContent = name.substring(0,2).toUpperCase();
   
-  if (isMasterAdmin) {
+  if (name === ADMIN_USER && pin === ADMIN_PIN) {
     document.getElementById('admin-toggle-btn').style.display = 'flex';
   }
   
@@ -453,12 +482,18 @@ function doLogout() {
   state.currentUser = null; state.currentLeague = null;
   document.getElementById('screen-main').classList.remove('active');
   document.getElementById('screen-home').classList.add('active');
-  document.getElementById('login-name').value = ''; document.getElementById('login-pin').value = ''; document.getElementById('login-league').value = '';
+  document.getElementById('login-name').value = ''; 
+  document.getElementById('login-pin').value = ''; 
+  document.getElementById('login-league').value = '';
+  
+  // Escondemos los campos para que la pantalla quede limpia para el siguiente
+  document.getElementById('league-group').style.display = 'none';
+  document.getElementById('login-error').style.display = 'none';
+  
   document.getElementById('admin-toggle-btn').style.display = 'none';
   clearInterval(countdownTimer);
   switchTab('predictions');
 }
-
 // --- 6. RENDERIZADO DE PANTALLAS ---
 function switchTab(tab) {
   ['predictions','leaderboard','results','admin'].forEach(t => {
