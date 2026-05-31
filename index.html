@@ -539,7 +539,32 @@ function renderResults() {
 }
 
 function renderAdmin() {
-  let html='';
+  let html = '';
+  
+  // 1. NUEVA SECCIÓN: GESTIÓN DE JUGADORES
+  html += `<div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border-tertiary);">
+    <div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-users"></i> Manage Players</div>`;
+  
+  const users = Object.keys(state.users);
+  if (users.length <= 1) {
+    html += `<div style="font-size:12px; color:var(--color-text-tertiary);">No other players registered yet.</div>`;
+  } else {
+    users.forEach(u => {
+      // Evitamos poner un botón de borrar en tu propia cuenta de Admin
+      if (u !== ADMIN_USER) { 
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-radius:6px; margin-bottom:6px;">
+          <span style="font-size:13px; font-weight:500;">${u}</span>
+          <button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="deleteUser('${u}')">
+            <i class="ti ti-trash"></i> Delete
+          </button>
+        </div>`;
+      }
+    });
+  }
+  html += `</div>`;
+
+  // 2. SECCIÓN ORIGINAL: RESULTADOS DE PARTIDOS
+  html += `<div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-ball-football"></i> Match Results</div>`;
   MATCHES.forEach(m => {
     const real = state.results[m.id];
     html += `<div class="match-card">
@@ -556,7 +581,29 @@ function renderAdmin() {
       </div>
     </div>`;
   });
-  document.getElementById('admin-list').innerHTML=html;
+  document.getElementById('admin-list').innerHTML = html;
+}
+
+// NUEVA FUNCION: Eliminar usuario de Firebase y del juego
+async function deleteUser(username) {
+  // Doble confirmación para evitar accidentes en la pantalla del móvil
+  const confirmDelete = confirm(`¿Estás seguro de que quieres expulsar a "${username}"?\nSe borrarán todas sus predicciones y desaparecerá de la clasificación para siempre.`);
+  if (!confirmDelete) return;
+
+  // 1. Lo borramos de la base de datos de Firebase
+  await db.ref(`users/${username}`).remove();
+  await db.ref(`predictions/${username}`).remove();
+
+  // 2. Lo borramos de la memoria local de tu navegador
+  delete state.users[username];
+  delete state.predictions[username];
+
+  // 3. Refrescamos las pantallas para que desaparezca al instante
+  renderAdmin();
+  renderLeaderboard();
+  
+  // (Opcional) Un pequeño aviso de éxito
+  setTimeout(() => alert(`Usuario ${username} eliminado correctamente.`), 100);
 }
 
 async function saveResult(matchId) {
