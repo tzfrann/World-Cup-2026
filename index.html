@@ -375,7 +375,9 @@ function attachListeners(username) {
   if (schedulesListener) db.ref('schedules').off('value', schedulesListener);
   if (leaguesListener) db.ref('leagues').off('value', leaguesListener);
   if (usersListener) db.ref('users').off('value', usersListener);
-  if (predictionsListener && state.currentUser) db.ref(`predictions/${state.currentUser}`).off('value', predictionsListener);
+  
+  // EL CAMBIO: Apagamos el escuchador global anterior si existía
+  if (predictionsListener) db.ref('predictions').off('value', predictionsListener);
   
   resultsListener = db.ref('results').on('value', snap => {
     state.results = snap.exists() ? snap.val() : {};
@@ -392,16 +394,16 @@ function attachListeners(username) {
     renderAdmin();
   });
 
-  // Para actualizar motes en vivo en el Leaderboard
+  // Escuchamos si alguien se cambia el mote
   usersListener = db.ref('users').on('value', snap => {
     state.users = snap.exists() ? snap.val() : {};
-    renderLeaderboard(); renderAdmin();
+    renderLeaderboard(); renderAdmin(); renderResults();
   });
 
-  predictionsListener = db.ref(`predictions/${username}`).on('value', snap => {
-    if (!state.predictions[username]) state.predictions[username] = {};
-    if (snap.exists()) state.predictions[username] = snap.val();
-    renderPredictions(); renderNextMatch();
+  // EL CAMBIO PRINCIPAL: Ahora escuchamos a TODA la carpeta de predicciones en tiempo real
+  predictionsListener = db.ref('predictions').on('value', snap => {
+    state.predictions = snap.exists() ? snap.val() : {};
+    renderPredictions(); renderNextMatch(); renderLeaderboard(); renderResults();
   });
 }
 
