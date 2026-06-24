@@ -1171,6 +1171,8 @@ MATCHES.forEach(m => {
         <div style="display:flex; gap:4px; align-items:center;">
           <input type="datetime-local" id="dt-${m.id}" value="${timeVal}" class="score-input" style="font-size:11px; padding:2px 6px; width:140px; height:26px;">
           <button class="btn btn-sm" onclick="saveTime(${m.id})" style="padding:4px 8px; font-size:11px;">Set Time</button>
+          
+          ${m.id >= 73 ? `<button class="btn btn-sm btn-primary" onclick="editKnockoutTeams(${m.id})" style="padding:4px 8px; font-size:11px; margin-left:8px;">✏️ Equipos</button>` : ''}
         </div>
       </div>
       
@@ -1241,6 +1243,26 @@ async function deleteUser(username) {
   renderAdmin(); renderLeaderboard();
 }
 
+function editKnockoutTeams(matchId) {
+  // Pillamos los nombres actuales por si ya había algo escrito
+  const currentH = (state.knockout_teams && state.knockout_teams[matchId] && state.knockout_teams[matchId].h) ? state.knockout_teams[matchId].h : '';
+  const currentA = (state.knockout_teams && state.knockout_teams[matchId] && state.knockout_teams[matchId].a) ? state.knockout_teams[matchId].a : '';
+
+  // Preguntamos el equipo local
+  const homeTeam = prompt("Introduce el equipo LOCAL (ej. España):", currentH);
+  if (homeTeam === null) return; // Si cancelas, no hace nada
+
+  // Preguntamos el equipo visitante
+  const awayTeam = prompt("Introduce el equipo VISITANTE (ej. Francia):", currentA);
+  if (awayTeam === null) return; // Si cancelas, no hace nada
+
+  // Lo guardamos en Firebase. ¡Esto actualizará todas las pantallas al instante!
+  db.ref(`knockout_teams/${matchId}`).update({
+    h: homeTeam || 'TBD',
+    a: awayTeam || 'TBD'
+  });
+}
+  
  async function acceptUser(username) {
   await db.ref(`users/${username}/status`).set('accepted');
   state.users[username].status = 'accepted';
