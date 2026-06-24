@@ -808,38 +808,46 @@ function renderPredictions() {
   // 2. FILTRAMOS LOS PARTIDOS SEGÚN LA FASE ACTIVA
   const filteredMatches = MATCHES.filter(m => {
     if (state.activePhase === 'knockouts') return m.id >= 73;
-    return m.id <= 72; // Si no es knockouts, asume grupos por defecto
+    return m.id <= 72;
   });
 
   filteredMatches.forEach(m => { 
-    // Agrupamos por 'Matchday' o por 'Grupo' según lo que haya pedido el usuario
-    let sectionKey = sortBy === 'group' ? `Grupo ${m.g}` : m.date; 
+    // MEJORA: Si es la fase final, la cabecera es la ronda directamente (sin el texto "Grupo")
+    let sectionKey = state.activePhase === 'knockouts' ? m.g : (sortBy === 'group' ? `Grupo ${m.g}` : m.date); 
     if(!sections[sectionKey]) sections[sectionKey]=[]; 
     sections[sectionKey].push(m); 
   });
   
-  Object.keys(sections).sort().forEach(sec => {
+  // Definimos el mapa cronológico de la Fase Final para la ordenación
+  const knockoutOrder = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinales", "3º y 4º Puesto", "🏆 FINAL"];
+
+  // 3. ORDENAMOS LAS SECCIONES CON CRITERIO INTELIGENTE
+  Object.keys(sections).sort((a, b) => {
+    if (state.activePhase === 'knockouts') {
+      return knockoutOrder.indexOf(a) - knockoutOrder.indexOf(b);
+    }
+    return a.localeCompare(b, undefined, { numeric: true });
+  }).forEach(sec => {
     html += `<div class="group-header">${sec}</div>`;
     
-    // Si ordenamos por fecha, hacemos que los partidos se ordenen internamente por su hora real (si existe)
+    // Ordenación interna de los partidos de cada sección
     sections[sec].sort((a,b) => {
        if (sortBy === 'time') {
            const timeA = state.schedules[a.id] ? new Date(state.schedules[a.id]).getTime() : 0;
            const timeB = state.schedules[b.id] ? new Date(state.schedules[b.id]).getTime() : 0;
            if (timeA && timeB) return timeA - timeB;
        }
-       return a.id - b.id; // fallback al orden original
+       return a.id - b.id; // Al ir por ID, se respeta el orden del cuadro oficial
     }).forEach(m => {
       const pred = userPreds[m.id], locked = isLocked(m), real = state.results[m.id];
       
-      // Extraemos y formateamos la hora (ej: "11 jun, 21:00")
       const timeString = state.schedules[m.id] 
         ? new Date(state.schedules[m.id]).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) 
         : 'Horario pendiente';
 
       html += `<div class="match-card">
         <div class="match-meta" style="display:flex; justify-content:space-between;">
-          <span>${m.date} · Grupo ${m.g}</span>
+          <span>${state.activePhase === 'knockouts' ? 'Eliminatoria' : m.date} · ${state.activePhase === 'knockouts' ? m.g : 'Grupo ' + m.g}</span>
           <span style="color:var(--color-border-info); font-weight:500;"><i class="ti ti-calendar-time"></i> ${timeString}</span>
         </div>
         <div class="match-teams">
@@ -860,10 +868,9 @@ function renderPredictions() {
   
   document.getElementById('predictions-list').innerHTML = html;
   
-  // 3. ACTUALIZAMOS LA BARRA DE PROGRESO BASÁNDONOS SOLO EN LA PESTAÑA ACTUAL
+  // 4. ACTUALIZAMOS LA BARRA DE PROGRESO
   const filled = filteredMatches.filter(m => userPreds[m.id]!==undefined && userPreds[m.id].h!=='' && userPreds[m.id].a!=='').length;
   document.getElementById('pred-progress-label').textContent = `${filled} / ${filteredMatches.length} predicciones`;
-  // Evitamos dividir por cero si por algún motivo la lista estuviera vacía
   const progressPercent = filteredMatches.length > 0 ? Math.round(filled/filteredMatches.length*100) : 0;
   document.getElementById('pred-progress-bar').style.width = progressPercent + '%';
 }
