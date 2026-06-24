@@ -326,6 +326,30 @@ const FLAGS = {
   'England':'gb-eng', 'Croatia':'hr', 'Ghana':'gh', 'Panama':'pa'
 };
 
+// Árbol de eliminatorias: { next: ID_siguiente_partido, pos: 'h' (local) o 'a' (visitante) }
+const BRACKET = {
+  // Dieciseisavos (Partidos 73 al 88)
+  73: { next: 89, pos: 'h' }, 74: { next: 89, pos: 'a' },
+  75: { next: 90, pos: 'h' }, 76: { next: 90, pos: 'a' },
+  77: { next: 91, pos: 'h' }, 78: { next: 91, pos: 'a' },
+  79: { next: 92, pos: 'h' }, 80: { next: 92, pos: 'a' },
+  81: { next: 93, pos: 'h' }, 82: { next: 93, pos: 'a' },
+  83: { next: 94, pos: 'h' }, 84: { next: 94, pos: 'a' },
+  85: { next: 95, pos: 'h' }, 86: { next: 95, pos: 'a' },
+  87: { next: 96, pos: 'h' }, 88: { next: 96, pos: 'a' },
+  // Octavos (89 al 96)
+  89: { next: 97, pos: 'h' }, 90: { next: 97, pos: 'a' },
+  91: { next: 98, pos: 'h' }, 92: { next: 98, pos: 'a' },
+  93: { next: 99, pos: 'h' }, 94: { next: 99, pos: 'a' },
+  95: { next: 100, pos: 'h' }, 96: { next: 100, pos: 'a' },
+  // Cuartos (97 al 100)
+  97: { next: 101, pos: 'h' }, 98: { next: 101, pos: 'a' },
+  99: { next: 102, pos: 'h' }, 100: { next: 102, pos: 'a' },
+  // Semis (101 y 102) -> Mandan al ganador a la Final (104) y al perdedor al 3º Puesto (103)
+  101: { next: 104, pos: 'h', loserNext: 103, loserPos: 'h' },
+  102: { next: 104, pos: 'a', loserNext: 103, loserPos: 'a' }
+};
+
 function renderTeam(teamName, isAway = false) {
   const code = FLAGS[teamName];
   const imgHtml = code ? `<img src="https://flagcdn.com/w20/${code}.png" width="18" style="border-radius:2px; box-shadow:0 0 1px rgba(0,0,0,0.3);">` : '';
@@ -817,6 +841,29 @@ async function renderLeaderboard() {
   const users = Object.keys(state.users).filter(u => 
     u !== ADMIN_USER && state.users[u].leagues && state.users[u].leagues[state.currentLeague]
   );
+
+async function advanceTeam(matchId, winnerSide) {
+  const nextData = BRACKET[matchId];
+  if (!nextData) return; // Si es la final o fase de grupos, no hace nada
+
+  // Obtenemos los nombres de los equipos de este partido
+  const currentTeams = state.knockout_teams && state.knockout_teams[matchId] 
+                       ? state.knockout_teams[matchId] 
+                       : { h: 'TBD', a: 'TBD' };
+
+  const winnerName = winnerSide === 'h' ? currentTeams.h : currentTeams.a;
+  const loserName = winnerSide === 'h' ? currentTeams.a : currentTeams.h;
+
+  if (winnerName === 'TBD') return;
+
+  // Escribimos el nombre del ganador en el hueco del siguiente partido
+  await db.ref(`knockout_teams/${nextData.next}/${nextData.pos}`).set(winnerName);
+
+  // Lógica especial para las semifinales (mandar al perdedor al 3er y 4o puesto)
+  if (nextData.loserNext) {
+    await db.ref(`knockout_teams/${nextData.loserNext}/${nextData.loserPos}`).set(loserName);
+  }
+}
   
   const ranked = users.map(u => {
     const userPreds = allPreds[u] || {};
@@ -1040,9 +1087,22 @@ function renderAdmin() {
   html += `</div>`;
 
   html += `<div style="font-size:14px; font-weight:600; margin-bottom:12px;"><i class="ti ti-ball-football"></i> Match Results & Schedules</div>`;
-  MATCHES.forEach(m => {
+MATCHES.forEach(m => {
     const real = state.results[m.id];
     const timeVal = state.schedules[m.id] || '';
+    
+    // --- AQUÍ VA EL PASO 4 (Lógica de desempate) ---
+    let tieBreakerHtml = '';
+    if (m.id >= 73 && real && real.h !== undefined && real.a !== undefined && real.h === real.a) {
+      tieBreakerHtml = `
+        <div style="display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--color-border-tertiary);">
+          <span style="font-size:11px; font-weight:600; color:var(--color-text-secondary); display:flex; align-items:center;">¿Penaltis?</span>
+          <button class="btn btn-sm" style="background:#5cb85c; border:none; padding:4px 8px; font-size:11px; color:white;" onclick="advanceTeam(${m.id}, 'h')">🏆 Pasa Local</button>
+          <button class="btn btn-sm" style="background:#5cb85c; border:none; padding:4px 8px; font-size:11px; color:white;" onclick="advanceTeam(${m.id}, 'a')">🏆 Pasa Vis.</button>
+        </div>
+      `;
+    }
+    // ----------------------------------------------
     
     html += `<div class="match-card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
@@ -1063,8 +1123,10 @@ function renderAdmin() {
         <button class="btn btn-sm btn-primary" onclick="saveResult(${m.id})">Save Result</button>
         ${real ? `<button class="btn btn-sm" style="color:#d9534f; border-color:#d9534f; background:transparent;" onclick="clearResult(${m.id})" title="Clear Result"><i class="ti ti-eraser"></i></button>` : ''}
       </div>
-    </div>`;
+      
+      ${tieBreakerHtml} </div>`;
   });
+  
   document.getElementById('admin-list').innerHTML = html;
 }
 
@@ -1094,6 +1156,15 @@ async function saveResult(matchId) {
   const h = parseInt(document.getElementById('rh-'+matchId).value);
   const a = parseInt(document.getElementById('ra-'+matchId).value);
   if (!isNaN(h) && !isNaN(a)) { await db.ref(`results/${matchId}`).set({ h, a }); }
+  // Lógica de avance automático para eliminatorias (A partir del partido 73)
+  if (matchId >= 73) {
+    if (h > a) {
+      advanceTeam(matchId, 'h'); // Avanza el local directamente
+    } else if (a > h) {
+      advanceTeam(matchId, 'a'); // Avanza el visitante directamente
+    }
+    // Si h == a, es un empate. No hacemos nada y esperamos a que el Admin pulse el botón manual.
+  }
 }
 
 async function clearResult(matchId) {
