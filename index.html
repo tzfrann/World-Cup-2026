@@ -374,7 +374,8 @@ for (const [g, teams] of Object.entries(GROUPS)) {
       date: 'Matchday ' + (Math.floor(index / 2) + 1)
     });
   });
-// --- INYECCIÓN DE LA FASE FINAL ---
+}
+  // --- INYECCIÓN DE LA FASE FINAL ---
 // Partidos del 73 al 104 (Dieciseisavos hasta la Final)
 for (let i = 73; i <= 104; i++) {
   let ronda = "Fase Final";
@@ -392,7 +393,6 @@ for (let i = 73; i <= 104; i++) {
     g: ronda,
     date: ronda
   });
-}
 }
 
 // --- 3. CONFIGURACIÓN ADMIN Y ESTADO ---
