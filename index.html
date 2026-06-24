@@ -374,12 +374,31 @@ for (const [g, teams] of Object.entries(GROUPS)) {
       date: 'Matchday ' + (Math.floor(index / 2) + 1)
     });
   });
+// --- INYECCIÓN DE LA FASE FINAL ---
+// Partidos del 73 al 104 (Dieciseisavos hasta la Final)
+for (let i = 73; i <= 104; i++) {
+  let ronda = "Fase Final";
+  if (i >= 73 && i <= 88) ronda = "Dieciseisavos";
+  else if (i >= 89 && i <= 96) ronda = "Octavos";
+  else if (i >= 97 && i <= 100) ronda = "Cuartos";
+  else if (i === 101 || i === 102) ronda = "Semifinales";
+  else if (i === 103) ronda = "3º y 4º Puesto";
+  else if (i === 104) ronda = "🏆 FINAL";
+
+  MATCHES.push({
+    id: i,
+    home: 'TBD', // To Be Decided
+    away: 'TBD',
+    g: ronda,
+    date: ronda
+  });
+}
 }
 
 // --- 3. CONFIGURACIÓN ADMIN Y ESTADO ---
 const ADMIN_PIN = '0000';
 const ADMIN_USER = 'Admin';
-let state = { users:{}, predictions:{}, results:{}, schedules:{}, leagues:{}, currentUser:null, currentLeague:null }; 
+let state = { users:{}, predictions:{}, results:{}, schedules:{}, leagues:{}, activePhase: 'groups', currentUser:null, currentLeague:null }; 
 
 // --- 4. LÓGICA DE LA NUBE ---
 async function loadState() {
@@ -428,6 +447,21 @@ function attachListeners(username) {
   predictionsListener = db.ref('predictions').on('value', snap => {
     state.predictions = snap.exists() ? snap.val() : {};
     renderPredictions(); renderNextMatch(); renderLeaderboard(); renderResults();
+  });
+  // Escuchamos el árbol de eliminatorias en tiempo real
+  db.ref('knockout_teams').on('value', snap => {
+    state.knockout_teams = snap.exists() ? snap.val() : {};
+    
+    // Actualizamos los nombres en la lista visual al instante
+    MATCHES.forEach(m => {
+      if (m.id >= 73) {
+        m.home = (state.knockout_teams[m.id] && state.knockout_teams[m.id].h) ? state.knockout_teams[m.id].h : 'TBD';
+        m.away = (state.knockout_teams[m.id] && state.knockout_teams[m.id].a) ? state.knockout_teams[m.id].a : 'TBD';
+      }
+    });
+    
+    // Repintamos la pantalla para que aparezcan los países
+    renderPredictions(); renderAdmin(); renderNextMatch();
   });
 }
 
@@ -754,15 +788,30 @@ function changePredSort() {
 
 function renderPredictions() {
   const uid = state.currentUser; 
+  if (!uid) return;
   const userPreds = state.predictions[uid] || {};
   
   // Leemos si el selector está en 'time' o 'group' ('time' por defecto)
   const sortSelect = document.getElementById('pred-sort-select');
   const sortBy = sortSelect ? sortSelect.value : 'time'; 
   
-  let sections = {}, html = '';
+  // 1. INYECTAMOS LOS BOTONES DE LAS SUB-PESTAÑAS
+  let html = `
+    <div style="display:flex; justify-content:center; gap:8px; margin-bottom:16px;">
+      <button class="btn btn-sm ${state.activePhase !== 'knockouts' ? 'btn-primary' : ''}" onclick="state.activePhase='groups'; renderPredictions();" style="border: 1px solid var(--color-border-tertiary);">Fase de Grupos</button>
+      <button class="btn btn-sm ${state.activePhase === 'knockouts' ? 'btn-primary' : ''}" onclick="state.activePhase='knockouts'; renderPredictions();" style="border: 1px solid var(--color-border-tertiary);">🏆 Fase Final</button>
+    </div>
+  `;
   
-  MATCHES.forEach(m => { 
+  let sections = {};
+  
+  // 2. FILTRAMOS LOS PARTIDOS SEGÚN LA FASE ACTIVA
+  const filteredMatches = MATCHES.filter(m => {
+    if (state.activePhase === 'knockouts') return m.id >= 73;
+    return m.id <= 72; // Si no es knockouts, asume grupos por defecto
+  });
+
+  filteredMatches.forEach(m => { 
     // Agrupamos por 'Matchday' o por 'Grupo' según lo que haya pedido el usuario
     let sectionKey = sortBy === 'group' ? `Grupo ${m.g}` : m.date; 
     if(!sections[sectionKey]) sections[sectionKey]=[]; 
@@ -780,7 +829,7 @@ function renderPredictions() {
            if (timeA && timeB) return timeA - timeB;
        }
        return a.id - b.id; // fallback al orden original
-  }).forEach(m => {
+    }).forEach(m => {
       const pred = userPreds[m.id], locked = isLocked(m), real = state.results[m.id];
       
       // Extraemos y formateamos la hora (ej: "11 jun, 21:00")
@@ -811,11 +860,13 @@ function renderPredictions() {
   
   document.getElementById('predictions-list').innerHTML = html;
   
-  const filled = MATCHES.filter(m => userPreds[m.id]!==undefined && userPreds[m.id].h!=='' && userPreds[m.id].a!=='').length;
-  document.getElementById('pred-progress-label').textContent = `${filled} / ${MATCHES.length} predicciones`;
-  document.getElementById('pred-progress-bar').style.width = Math.round(filled/MATCHES.length*100)+'%';
+  // 3. ACTUALIZAMOS LA BARRA DE PROGRESO BASÁNDONOS SOLO EN LA PESTAÑA ACTUAL
+  const filled = filteredMatches.filter(m => userPreds[m.id]!==undefined && userPreds[m.id].h!=='' && userPreds[m.id].a!=='').length;
+  document.getElementById('pred-progress-label').textContent = `${filled} / ${filteredMatches.length} predicciones`;
+  // Evitamos dividir por cero si por algún motivo la lista estuviera vacía
+  const progressPercent = filteredMatches.length > 0 ? Math.round(filled/filteredMatches.length*100) : 0;
+  document.getElementById('pred-progress-bar').style.width = progressPercent + '%';
 }
-
 async function savePredictions() {
   const uid = state.currentUser; if (!state.predictions[uid]) state.predictions[uid] = {};
   MATCHES.forEach(m => {
